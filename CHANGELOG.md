@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.3.1 - Player Waystone Ownership & Access
+
+- Added first-class Player Waystone access modes: `PRIVATE`, `TRUSTED`, and `PUBLIC`.
+- Existing Player Waystones migrate safely to configurable `ownership.default-access` (PRIVATE by default).
+- Added persistent per-Waystone trusted-player UUID lists in `waystones.yml`.
+- Added centralized access validation used by discovery, activation, Key binding, GUI interaction, and teleport.
+- Player Waystones can now only be broken by their owner or an administrator.
+- Added configurable Player Waystone ownership limit, defaulting to 3 per player.
+- Added `cdrwaystone.limit.bypass` permission for unlimited placement.
+- Placement is rejected cleanly when a player reaches their Waystone limit.
+- Added `/cws access <private|trusted|public>`.
+- Added `/cws trust <player>`, `/cws untrust <player>`, and `/cws trusted`.
+- Trusting the first player automatically upgrades a PRIVATE Waystone to TRUSTED for easier setup.
+- Added `/cws transfer <online-player>` with target ownership-limit validation.
+- Ownership transfer resets access to PRIVATE, clears the old trusted list, activates the Waystone for the new owner, and removes the old owner's privileged access.
+- Added `/cws limit` to show current owned Waystones versus the configured limit.
+- Added a premium Player Ownership & Access GUI panel with direct PRIVATE/TRUSTED/PUBLIC selection.
+- Added trusted-player summaries and transfer/trust command guidance inside the GUI.
+- Admin Waystones keep their independent public/private server policy and are unaffected by Player access modes.
+- Promoting a Player Waystone to an Admin Waystone clears Player ownership/trusted access metadata.
+- Previously activated Keys can no longer bypass access after an owner changes a Waystone to PRIVATE/TRUSTED or removes trust.
+
 ## 0.3.0 - Discovery & Activation System
 
 - Added per-player Waystone progression: `UNKNOWN -> DISCOVERED -> ACTIVATED`.
