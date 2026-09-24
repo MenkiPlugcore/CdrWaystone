@@ -9,7 +9,7 @@ commands:
   cdrwaystone:
     description: Main CdrWaystone command
     aliases: [cws, cdrws]
-    usage: /cws <getkey|skin|skins|refresh|reload|info|remove>
+    usage: /cws <getkey|skin|skins|admin|refresh|reload|info|remove>
 permissions:
   cdrwaystone.use:
     description: Allows using CdrWaystones and Waystone Keys
@@ -18,5 +18,5 @@ permissions:
     description: Allows owners to change their Waystone skin
     default: true
   cdrwaystone.admin:
-    description: Administrative access to CdrWaystone
+    description: Administrative access to CdrWaystone and Admin Waystones
     default: op
