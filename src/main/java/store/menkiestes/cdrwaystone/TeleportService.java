@@ -17,6 +17,18 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 public final class TeleportService {
+    public enum TravelStatus {
+        READY,
+        WORLD_UNAVAILABLE,
+        MISSING,
+        NO_ACCESS,
+        NOT_DISCOVERED,
+        NOT_ACTIVATED,
+        SUPPRESSED,
+        CROSS_WORLD_DISABLED,
+        NO_POWER
+    }
+
     private final CdrWaystonePlugin plugin;
     private final Map<UUID, BukkitTask> active = new HashMap<>();
     private final Map<UUID, Location> startLocations = new HashMap<>();
@@ -64,32 +76,60 @@ public final class TeleportService {
     public Location startLocation(Player player) { return startLocations.get(player.getUniqueId()); }
     private void cleanup(Player player) { active.remove(player.getUniqueId()); startLocations.remove(player.getUniqueId()); }
 
-    private boolean validateTarget(Player player, WaystoneData target) {
+    public TravelStatus travelStatus(Player player, WaystoneData target) {
+        if (player == null || target == null) return TravelStatus.MISSING;
         Location targetLoc = target.location();
-        if (targetLoc == null) { player.sendMessage("§cThat Waystone world is unavailable."); return false; }
-        if (targetLoc.getBlock().getType() != Material.LODESTONE) { player.sendMessage("§cThat Waystone no longer exists."); return false; }
+        if (targetLoc == null || targetLoc.getWorld() == null) return TravelStatus.WORLD_UNAVAILABLE;
+        if (targetLoc.getBlock().getType() != Material.LODESTONE) return TravelStatus.MISSING;
 
-        if (!plugin.access().canAccess(player, target)) {
-            if (target.isAdmin()) player.sendMessage("§cThat Admin Waystone is not public.");
-            else player.sendMessage("§cYou no longer have access to that Player Waystone.");
-            return false;
-        }
+        if (!plugin.access().canAccess(player, target)) return TravelStatus.NO_ACCESS;
 
         if (!plugin.discovery().canUse(player, target)) {
             DiscoveryService.State state = plugin.discovery().status(player, target);
-            if (state == DiscoveryService.State.UNKNOWN) player.sendMessage("§7You have not discovered that Waystone yet.");
-            else player.sendMessage("§dYou discovered that Waystone, but it has not been activated yet.");
-            return false;
+            return state == DiscoveryService.State.UNKNOWN ? TravelStatus.NOT_DISCOVERED : TravelStatus.NOT_ACTIVATED;
         }
-        if (!target.alwaysActive() && isSuppressed(target)) { player.sendMessage("§cThat Waystone is suppressed."); return false; }
+
+        if (!target.alwaysActive() && isSuppressed(target)) return TravelStatus.SUPPRESSED;
+
         boolean crossWorld = !player.getWorld().getUID().equals(target.worldId());
-        if (crossWorld && !plugin.getConfig().getBoolean("warp.allow-cross-world", true)) {
-            player.sendMessage("§cCross-world Waystone travel is disabled."); return false;
+        if (crossWorld && !plugin.getConfig().getBoolean("warp.allow-cross-world", true)) return TravelStatus.CROSS_WORLD_DISABLED;
+        if (!target.alwaysActive() && requiresPower(crossWorld) && !hasPower(target)) return TravelStatus.NO_POWER;
+        return TravelStatus.READY;
+    }
+
+    public String statusLabel(TravelStatus status) {
+        return switch (status) {
+            case READY -> "Ready";
+            case WORLD_UNAVAILABLE -> "World unavailable";
+            case MISSING -> "Waystone missing";
+            case NO_ACCESS -> "Access denied";
+            case NOT_DISCOVERED -> "Not discovered";
+            case NOT_ACTIVATED -> "Not activated";
+            case SUPPRESSED -> "Suppressed";
+            case CROSS_WORLD_DISABLED -> "Cross-world disabled";
+            case NO_POWER -> "No dimensional power";
+        };
+    }
+
+    private boolean validateTarget(Player player, WaystoneData target) {
+        TravelStatus status = travelStatus(player, target);
+        if (status == TravelStatus.READY) return true;
+
+        switch (status) {
+            case WORLD_UNAVAILABLE -> player.sendMessage("§cThat Waystone world is unavailable.");
+            case MISSING -> player.sendMessage("§cThat Waystone no longer exists.");
+            case NO_ACCESS -> {
+                if (target != null && target.isAdmin()) player.sendMessage("§cThat Admin Waystone is not public.");
+                else player.sendMessage("§cYou no longer have access to that Player Waystone.");
+            }
+            case NOT_DISCOVERED -> player.sendMessage("§7You have not discovered that Waystone yet.");
+            case NOT_ACTIVATED -> player.sendMessage("§dYou discovered that Waystone, but it has not been activated yet.");
+            case SUPPRESSED -> player.sendMessage("§cThat Waystone is suppressed.");
+            case CROSS_WORLD_DISABLED -> player.sendMessage("§cCross-world Waystone travel is disabled.");
+            case NO_POWER -> player.sendMessage("§cThat Waystone needs a charged Respawn Anchor below it.");
+            default -> player.sendMessage("§cThat Waystone cannot be used right now.");
         }
-        if (!target.alwaysActive() && requiresPower(crossWorld) && !hasPower(target)) {
-            player.sendMessage("§cThat Waystone needs a charged Respawn Anchor below it."); return false;
-        }
-        return true;
+        return false;
     }
 
     public boolean isSuppressed(WaystoneData data) {
