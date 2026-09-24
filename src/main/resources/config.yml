@@ -1,4 +1,4 @@
-# CdrWaystone v0.5.0
+# CdrWaystone v0.5.1
 # Paper 1.21.11 + Java 21
 
 waystones:
@@ -78,6 +78,27 @@ economy:
     material: EMERALD
     display-name: Emerald
     value: 250.0
+
+# Cooldown & Anti-Abuse Engine
+anti-abuse:
+  cooldown:
+    enabled: true
+    # Starts only after a successful Waystone teleport.
+    seconds: 30
+
+  combat:
+    enabled: true
+    # Both PvP attacker and victim are tagged.
+    tag-seconds: 15
+    # Immediately cancels an active Waystone warmup when PvP starts.
+    cancel-active-warp: true
+
+  knockout:
+    enabled: true
+    # Uses the public CdrKnockout Bukkit service when that plugin is installed.
+    # CdrWaystone still works normally without CdrKnockout.
+    block-knocked: true
+    block-death-in-progress: true
 
 warp:
   delay-seconds: 5
