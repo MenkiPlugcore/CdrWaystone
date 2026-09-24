@@ -45,9 +45,11 @@ public final class WaystoneRegistry {
                 String name = yaml.getString(path + ".name", "Waystone");
                 String skin = yaml.getString(path + ".skin", "andesite");
                 boolean collisionOwned = yaml.contains(path + ".collision-owned") ? yaml.getBoolean(path + ".collision-owned") : true;
+
                 WaystoneData.Type type;
                 try { type = WaystoneData.Type.valueOf(yaml.getString(path + ".type", "PLAYER").toUpperCase(Locale.ROOT)); }
                 catch (IllegalArgumentException ex) { type = WaystoneData.Type.PLAYER; }
+
                 boolean publicAccess = yaml.getBoolean(path + ".public", type == WaystoneData.Type.ADMIN);
                 boolean freeTravel = yaml.getBoolean(path + ".free", type == WaystoneData.Type.ADMIN);
                 boolean permanent = yaml.getBoolean(path + ".permanent", type == WaystoneData.Type.ADMIN);
@@ -55,8 +57,22 @@ public final class WaystoneRegistry {
                 boolean globallyDiscovered = yaml.contains(path + ".globally-discovered")
                         ? yaml.getBoolean(path + ".globally-discovered")
                         : type == WaystoneData.Type.ADMIN && plugin.getConfig().getBoolean("admin-waystones.default-globally-discovered", true);
+
+                WaystoneData.AccessMode accessMode;
+                try {
+                    String defaultMode = plugin.getConfig().getString("ownership.default-access", "PRIVATE");
+                    accessMode = WaystoneData.AccessMode.valueOf(yaml.getString(path + ".access-mode", defaultMode).toUpperCase(Locale.ROOT));
+                } catch (IllegalArgumentException ex) {
+                    accessMode = WaystoneData.AccessMode.PRIVATE;
+                }
+
+                Set<UUID> trusted = new LinkedHashSet<>();
+                for (String rawTrusted : yaml.getStringList(path + ".trusted")) {
+                    try { trusted.add(UUID.fromString(rawTrusted)); } catch (IllegalArgumentException ignored) {}
+                }
+
                 WaystoneData data = new WaystoneData(id, owner, worldId, worldName, x, y, z, name, skin, collisionOwned,
-                        type, publicAccess, freeTravel, permanent, alwaysActive, globallyDiscovered);
+                        type, publicAccess, freeTravel, permanent, alwaysActive, globallyDiscovered, accessMode, trusted);
                 byId.put(id, data);
                 byLocation.put(locationKey(worldId, x, y, z), id);
             } catch (Exception ex) {
@@ -82,6 +98,8 @@ public final class WaystoneRegistry {
             yaml.set(path + ".permanent", data.permanent());
             yaml.set(path + ".always-active", data.alwaysActive());
             yaml.set(path + ".globally-discovered", data.globallyDiscovered());
+            yaml.set(path + ".access-mode", data.accessMode().name());
+            yaml.set(path + ".trusted", data.trustedPlayers().stream().map(UUID::toString).toList());
         }
         File tempFile = new File(plugin.getDataFolder(), "waystones.yml.tmp");
         try {
@@ -97,21 +115,33 @@ public final class WaystoneRegistry {
     }
 
     public synchronized WaystoneData create(UUID owner, Location location, String name, String skin) {
-        return create(owner, location, name, skin, WaystoneData.Type.PLAYER, false, false, false, false, false);
+        WaystoneData.AccessMode mode;
+        try { mode = WaystoneData.AccessMode.valueOf(plugin.getConfig().getString("ownership.default-access", "PRIVATE").toUpperCase(Locale.ROOT)); }
+        catch (IllegalArgumentException ex) { mode = WaystoneData.AccessMode.PRIVATE; }
+        return create(owner, location, name, skin, WaystoneData.Type.PLAYER, false, false, false, false, false, mode, Set.of());
     }
 
     public synchronized WaystoneData create(UUID owner, Location location, String name, String skin, WaystoneData.Type type,
                                              boolean publicAccess, boolean freeTravel, boolean permanent, boolean alwaysActive) {
-        return create(owner, location, name, skin, type, publicAccess, freeTravel, permanent, alwaysActive, false);
+        return create(owner, location, name, skin, type, publicAccess, freeTravel, permanent, alwaysActive, false,
+                WaystoneData.AccessMode.PRIVATE, Set.of());
     }
 
     public synchronized WaystoneData create(UUID owner, Location location, String name, String skin, WaystoneData.Type type,
                                              boolean publicAccess, boolean freeTravel, boolean permanent,
                                              boolean alwaysActive, boolean globallyDiscovered) {
+        return create(owner, location, name, skin, type, publicAccess, freeTravel, permanent, alwaysActive, globallyDiscovered,
+                WaystoneData.AccessMode.PRIVATE, Set.of());
+    }
+
+    public synchronized WaystoneData create(UUID owner, Location location, String name, String skin, WaystoneData.Type type,
+                                             boolean publicAccess, boolean freeTravel, boolean permanent,
+                                             boolean alwaysActive, boolean globallyDiscovered,
+                                             WaystoneData.AccessMode accessMode, Set<UUID> trusted) {
         UUID id = UUID.randomUUID();
         WaystoneData data = new WaystoneData(id, owner, location.getWorld().getUID(), location.getWorld().getName(),
                 location.getBlockX(), location.getBlockY(), location.getBlockZ(), name, skin, false,
-                type, publicAccess, freeTravel, permanent, alwaysActive, globallyDiscovered);
+                type, publicAccess, freeTravel, permanent, alwaysActive, globallyDiscovered, accessMode, trusted);
         byId.put(id, data);
         byLocation.put(locationKey(location), id);
         save();
@@ -122,14 +152,27 @@ public final class WaystoneRegistry {
         UUID id = byLocation.get(locationKey(location));
         return id == null ? null : byId.get(id);
     }
+
     public WaystoneData get(UUID id) { return byId.get(id); }
     public Collection<WaystoneData> all() { return Collections.unmodifiableCollection(new ArrayList<>(byId.values())); }
+
+    public long countOwned(UUID owner) {
+        if (owner == null) return 0;
+        return byId.values().stream().filter(data -> !data.isAdmin() && owner.equals(data.owner())).count();
+    }
+
+    public List<WaystoneData> ownedBy(UUID owner) {
+        if (owner == null) return List.of();
+        return byId.values().stream().filter(data -> !data.isAdmin() && owner.equals(data.owner())).toList();
+    }
+
     public synchronized void remove(WaystoneData data) { remove(data, true); }
     public synchronized void remove(WaystoneData data, boolean saveNow) {
         byId.remove(data.id());
         byLocation.remove(locationKey(data.worldId(), data.x(), data.y(), data.z()));
         if (saveNow) save();
     }
+
     public List<WaystoneData> inChunk(World world, int chunkX, int chunkZ) {
         List<WaystoneData> list = new ArrayList<>();
         for (WaystoneData data : byId.values()) {
@@ -137,6 +180,7 @@ public final class WaystoneRegistry {
         }
         return list;
     }
+
     private String locationKey(Location location) { return locationKey(location.getWorld().getUID(), location.getBlockX(), location.getBlockY(), location.getBlockZ()); }
     private String locationKey(UUID worldId, int x, int y, int z) { return worldId + ":" + x + ":" + y + ":" + z; }
 }
