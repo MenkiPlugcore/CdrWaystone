@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.3.0 - Discovery & Activation System
+
+- Added per-player Waystone progression: `UNKNOWN -> DISCOVERED -> ACTIVATED`.
+- Added automatic proximity discovery with configurable radius and scan interval.
+- Added first-discovery title, sound and chat feedback.
+- Added `discoveries.yml` persistence with atomic writes and `discoveries.yml.bak` backup.
+- Existing Player Waystone owners remain effectively activated for backward compatibility.
+- Newly placed Player Waystones are explicitly activated for their owner.
+- Added a dedicated Discovery/Activation status item to the premium Waystone GUI.
+- Added one-click activation from the GUI after discovery.
+- Waystone Keys can no longer bind to a Waystone that the player has not activated.
+- Teleporting to a Waystone now requires that player to have activated it, unless the player has admin bypass.
+- Added `globally-discovered` metadata for Admin Waystones.
+- Added `admin-waystones.default-globally-discovered` configuration.
+- Added `/cws admin setglobal <true|false>` and a matching Admin GUI toggle.
+- Globally discovered Admin Waystones appear as `DISCOVERED` to all players but still require individual activation.
+- Private Admin Waystones are excluded from normal-player discovery.
+- Discovery data is cleaned when a Waystone is removed or pruned as stale.
+- `/cws info` now shows global-discovery policy and the viewer's personal discovery state.
+
 ## 0.2.1 - Admin Waystone System
 
 - Added first-class `PLAYER` and `ADMIN` Waystone types with backward-compatible migration for existing data.
