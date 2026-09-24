@@ -2,6 +2,7 @@ package store.menkiestes.cdrwaystone;
 
 import org.bukkit.*;
 import org.bukkit.block.Block;
+import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.inventory.ItemStack;
@@ -15,6 +16,7 @@ import org.joml.Vector3f;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public final class VisualService {
     private final CdrWaystonePlugin plugin;
@@ -70,24 +72,27 @@ public final class VisualService {
             return;
         }
 
-        double yOffset = plugin.getConfig().getDouble("visuals.y-offset", 0.0);
+        double yOffset = plugin.getConfig().getDouble("visuals.model-y-offset", 0.5);
         float rotation = (float) Math.toRadians(plugin.getConfig().getDouble("visuals.rotation-degrees", 0.0));
         float viewRange = (float) plugin.getConfig().getDouble("visuals.view-range", 1.5);
+        float scale = (float) Math.max(0.05, plugin.getConfig().getDouble("visuals.scale", 1.0));
+        ItemDisplay.ItemDisplayTransform transform = configuredTransform();
         Location spawnAt = base.clone().add(0.5, yOffset, 0.5);
 
         base.getWorld().spawn(spawnAt, ItemDisplay.class, display -> {
             display.setItemStack(modelItem);
-            display.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.HEAD);
-            display.setBillboard(org.bukkit.entity.Display.Billboard.FIXED);
+            display.setItemDisplayTransform(transform);
+            display.setBillboard(Display.Billboard.FIXED);
             display.setViewRange(viewRange);
             display.setPersistent(false);
             display.getPersistentDataContainer().set(visualMarker, PersistentDataType.BYTE, (byte) 1);
             display.getPersistentDataContainer().set(visualIdMarker, PersistentDataType.STRING, data.id().toString());
+
             Transformation old = display.getTransformation();
             display.setTransformation(new Transformation(
                     old.getTranslation(),
                     new Quaternionf(new AxisAngle4f(rotation, 0f, 1f, 0f)),
-                    new Vector3f(1f, 1f, 1f),
+                    new Vector3f(scale, scale, scale),
                     old.getRightRotation()
             ));
         });
@@ -122,8 +127,6 @@ public final class VisualService {
                 entity.remove();
                 continue;
             }
-            // v0.1.0 visuals had no per-Waystone ID. Only clean a legacy visual
-            // when it is physically centered on this Waystone.
             if (visualId == null) {
                 Location entityLoc = entity.getLocation();
                 double dx = entityLoc.getX() - (base.getBlockX() + 0.5);
@@ -182,6 +185,17 @@ public final class VisualService {
         Block top = base.clone().add(0, 1, 0).getBlock();
         if (top.getType() == Material.BARRIER) top.setType(Material.AIR, false);
         data.collisionOwned(false);
+    }
+
+    private ItemDisplay.ItemDisplayTransform configuredTransform() {
+        String raw = plugin.getConfig().getString("visuals.display-transform", "FIXED");
+        if (raw == null) return ItemDisplay.ItemDisplayTransform.FIXED;
+        try {
+            return ItemDisplay.ItemDisplayTransform.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ignored) {
+            plugin.getLogger().warning("Unknown visuals.display-transform '" + raw + "'. Using FIXED.");
+            return ItemDisplay.ItemDisplayTransform.FIXED;
+        }
     }
 
     private ItemStack getItemsAdderItem(String id) {
