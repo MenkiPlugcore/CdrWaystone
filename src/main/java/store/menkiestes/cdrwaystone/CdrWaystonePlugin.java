@@ -17,6 +17,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     private WaystoneRegistry registry;
     private KeyService keys;
     private CoreService cores;
+    private TierService tiers;
     private VisualService visuals;
     private EconomyService economy;
     private TravelGuardService guards;
@@ -39,6 +40,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         registry.load();
         keys = new KeyService(this);
         cores = new CoreService(this);
+        tiers = new TierService(this);
         visuals = new VisualService(this);
         access = new AccessService(this);
         economy = new EconomyService(this);
@@ -64,6 +66,12 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         if (coreCommand != null) {
             coreCommand.setExecutor(coreHandler);
             coreCommand.setTabCompleter(coreHandler);
+        }
+        TierCommand tierHandler = new TierCommand(this);
+        PluginCommand tierCommand = getCommand("cdrwaystonetier");
+        if (tierCommand != null) {
+            tierCommand.setExecutor(tierHandler);
+            tierCommand.setTabCompleter(tierHandler);
         }
 
         registerKeyRecipe();
@@ -140,6 +148,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     public WaystoneRegistry registry() { return registry; }
     public KeyService keys() { return keys; }
     public CoreService cores() { return cores; }
+    public TierService tiers() { return tiers; }
     public VisualService visuals() { return visuals; }
     public EconomyService economy() { return economy; }
     public TravelGuardService guards() { return guards; }
