@@ -111,6 +111,7 @@ public final class DiscoveryService {
     }
 
     public boolean canUse(Player player, WaystoneData data) {
+        if (!data.coreActive() && !(data.isAdmin() && plugin.getConfig().getBoolean("core.admin-bypass", true))) return false;
         if (player.hasPermission("cdrwaystone.admin")) return true;
         return plugin.access().canAccess(player, data) && status(player, data) == State.ACTIVATED;
     }
@@ -125,6 +126,10 @@ public final class DiscoveryService {
     }
 
     public boolean activate(Player player, WaystoneData data) {
+        if (!data.coreActive() && !(data.isAdmin() && plugin.getConfig().getBoolean("core.admin-bypass", true))) {
+            player.sendMessage("§5This Waystone is Dormant. §7Install a §dWaystone Core§7 before attuning to it.");
+            return false;
+        }
         if (!plugin.getConfig().getBoolean("discovery.enabled", true)) return true;
         if (!plugin.access().canAccess(player, data)) {
             player.sendMessage("§cYou do not have access to this Waystone.");
@@ -203,6 +208,7 @@ public final class DiscoveryService {
                 Title.Times.times(Duration.ofMillis(250), Duration.ofMillis(1800), Duration.ofMillis(450))
         ));
         player.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_RESONATE, 0.8f, 0.85f);
-        player.sendMessage("§5Discovered §f" + data.name() + "§5. Right-click it to activate.");
+        String suffix = data.coreActive() ? "Right-click it to activate." : "This Waystone is Dormant and needs a Waystone Core.";
+        player.sendMessage("§5Discovered §f" + data.name() + "§5. §7" + suffix);
     }
 }
