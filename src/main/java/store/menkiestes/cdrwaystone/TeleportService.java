@@ -28,7 +28,10 @@ public final class TeleportService {
         CROSS_WORLD_DISABLED,
         NO_POWER,
         ECONOMY_UNAVAILABLE,
-        INSUFFICIENT_FUNDS
+        INSUFFICIENT_FUNDS,
+        COOLDOWN,
+        COMBAT_LOCKED,
+        KNOCKED_OUT
     }
 
     private final CdrWaystonePlugin plugin;
@@ -66,6 +69,13 @@ public final class TeleportService {
             int remaining = delay;
             @Override public void run() {
                 if (!player.isOnline()) { cleanup(player); cancel(); return; }
+
+                TravelGuardService.GuardStatus guardStatus = plugin.guards().status(player);
+                if (guardStatus != TravelGuardService.GuardStatus.READY) {
+                    player.sendActionBar(Component.text("Warp cancelled: " + plugin.guards().label(player, guardStatus)));
+                    cleanup(player); cancel(); return;
+                }
+
                 if (remaining <= 0) {
                     TravelStatus routeStatus = travelStatusCore(player, target);
                     if (!validateStatus(player, target, routeStatus)) { cleanup(player); cancel(); return; }
@@ -98,6 +108,7 @@ public final class TeleportService {
                     }
 
                     consumePowerIfNeeded(target, crossWorld);
+                    plugin.guards().markTravelSuccess(player);
                     if (payment.charged()) player.sendMessage("§aTravel paid: §f" + quote.formatted());
                     player.playSound(destination, Sound.BLOCK_PORTAL_TRAVEL, 0.6f, 1.2f);
                     applyPortalSickness(player);
@@ -140,6 +151,17 @@ public final class TeleportService {
 
     private TravelStatus travelStatusCore(Player player, WaystoneData target) {
         if (player == null || target == null) return TravelStatus.MISSING;
+
+        TravelGuardService.GuardStatus guard = plugin.guards().status(player);
+        if (guard != TravelGuardService.GuardStatus.READY) {
+            return switch (guard) {
+                case COOLDOWN -> TravelStatus.COOLDOWN;
+                case COMBAT_LOCKED -> TravelStatus.COMBAT_LOCKED;
+                case KNOCKED_OUT -> TravelStatus.KNOCKED_OUT;
+                default -> TravelStatus.READY;
+            };
+        }
+
         Location targetLoc = target.location();
         if (targetLoc == null || targetLoc.getWorld() == null) return TravelStatus.WORLD_UNAVAILABLE;
         if (targetLoc.getBlock().getType() != Material.LODESTONE) return TravelStatus.MISSING;
@@ -172,6 +194,9 @@ public final class TeleportService {
             case NO_POWER -> "No dimensional power";
             case ECONOMY_UNAVAILABLE -> "Economy unavailable";
             case INSUFFICIENT_FUNDS -> "Insufficient funds";
+            case COOLDOWN -> "Travel cooldown";
+            case COMBAT_LOCKED -> "Combat locked";
+            case KNOCKED_OUT -> "Knocked out";
         };
     }
 
@@ -192,6 +217,9 @@ public final class TeleportService {
             case NO_POWER -> player.sendMessage("§cThat Waystone needs a charged Respawn Anchor below it.");
             case ECONOMY_UNAVAILABLE -> player.sendMessage("§cTravel economy provider is unavailable.");
             case INSUFFICIENT_FUNDS -> player.sendMessage("§cYou cannot afford this Waystone route.");
+            case COOLDOWN -> player.sendMessage("§eWaystone travel is on cooldown for §f" + plugin.guards().cooldownRemainingSeconds(player) + "s§e.");
+            case COMBAT_LOCKED -> player.sendMessage("§cYou are combat tagged for another §f" + plugin.guards().combatRemainingSeconds(player) + "s§c.");
+            case KNOCKED_OUT -> player.sendMessage("§cYou cannot use Waystones while knocked out or while death is in progress.");
             default -> player.sendMessage("§cThat Waystone cannot be used right now.");
         }
         return false;
