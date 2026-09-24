@@ -62,7 +62,7 @@ public final class CdrWaystoneCommand implements CommandExecutor, TabCompleter {
         if (!admin(sender)) return;
         if (!(sender instanceof Player player)) { sender.sendMessage("§cAdmin Waystone editing is player-only."); return; }
         if (args.length < 2) {
-            sender.sendMessage("§6Admin Waystone: §f/cws admin create <name>, remove, setpublic, setfree, setpermanent, setactive, skin, info");
+            sender.sendMessage("§6Admin Waystone: §f/cws admin create <name>, remove, setpublic, setfree, setpermanent, setactive, setglobal, skin, info");
             return;
         }
         String action = args[1].toLowerCase(Locale.ROOT);
@@ -74,35 +74,39 @@ public final class CdrWaystoneCommand implements CommandExecutor, TabCompleter {
             String name = args.length >= 3 ? String.join(" ", Arrays.copyOfRange(args, 2, args.length)) : "Server Waystone";
             String skin = plugin.getConfig().getString("admin-waystones.default-skin", "divine");
             if (!plugin.skins().containsKey(skin)) skin = "andesite";
+            boolean global = plugin.getConfig().getBoolean("admin-waystones.default-globally-discovered", true);
             if (data == null) {
                 data = plugin.registry().create(null, block.getLocation(), name, skin, WaystoneData.Type.ADMIN,
                         plugin.getConfig().getBoolean("admin-waystones.default-public", true),
                         plugin.getConfig().getBoolean("admin-waystones.default-free", true),
                         plugin.getConfig().getBoolean("admin-waystones.default-permanent", true),
-                        plugin.getConfig().getBoolean("admin-waystones.default-always-active", true));
+                        plugin.getConfig().getBoolean("admin-waystones.default-always-active", true), global);
             } else {
                 data.type(WaystoneData.Type.ADMIN); data.owner(null); data.name(name); data.skin(skin);
                 data.publicAccess(plugin.getConfig().getBoolean("admin-waystones.default-public", true));
                 data.freeTravel(plugin.getConfig().getBoolean("admin-waystones.default-free", true));
                 data.permanent(plugin.getConfig().getBoolean("admin-waystones.default-permanent", true));
                 data.alwaysActive(plugin.getConfig().getBoolean("admin-waystones.default-always-active", true));
+                data.globallyDiscovered(global);
                 plugin.registry().save();
             }
+            plugin.discovery().setState(player.getUniqueId(), data.id(), DiscoveryService.State.ACTIVATED, true);
             plugin.visuals().ensureCollision(data); plugin.visuals().spawn(data);
-            sender.sendMessage("§6Admin Waystone created: §f" + data.name());
+            sender.sendMessage("§6Admin Waystone created: §f" + data.name() + " §7(Global Discovery: " + data.globallyDiscovered() + ")");
             return;
         }
 
         if (data == null || !data.isAdmin()) { sender.sendMessage("§cLook directly at an Admin Waystone."); return; }
         switch (action) {
             case "remove" -> {
-                plugin.visuals().remove(data); plugin.registry().remove(data);
+                plugin.visuals().remove(data); plugin.registry().remove(data); plugin.discovery().forgetWaystone(data.id());
                 sender.sendMessage("§eAdmin Waystone registry entry removed. Lodestone left in place.");
             }
             case "setpublic" -> toggle(sender, args, "public", data);
             case "setfree" -> toggle(sender, args, "free", data);
             case "setpermanent" -> toggle(sender, args, "permanent", data);
             case "setactive" -> toggle(sender, args, "active", data);
+            case "setglobal" -> toggle(sender, args, "global", data);
             case "skin" -> {
                 if (args.length < 3 || !plugin.skins().containsKey(args[2].toLowerCase(Locale.ROOT))) { sender.sendMessage("§cUsage: /cws admin skin <skin>"); return; }
                 data.skin(args[2].toLowerCase(Locale.ROOT)); plugin.registry().save(); plugin.visuals().spawn(data);
@@ -123,6 +127,7 @@ public final class CdrWaystoneCommand implements CommandExecutor, TabCompleter {
             case "free" -> data.freeTravel(value);
             case "permanent" -> data.permanent(value);
             case "active" -> data.alwaysActive(value);
+            case "global" -> data.globallyDiscovered(value);
         }
         plugin.registry().save();
         sender.sendMessage("§aAdmin Waystone " + field + " = §f" + value);
@@ -140,7 +145,8 @@ public final class CdrWaystoneCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§7ID: §f" + data.id());
         sender.sendMessage("§7Location: §f" + data.worldName() + " " + data.x() + ", " + data.y() + ", " + data.z());
         sender.sendMessage("§7Public: §f" + data.publicAccess() + " §7Free: §f" + data.freeTravel() + " §7Permanent: §f" + data.permanent() + " §7Always Active: §f" + data.alwaysActive());
-        sender.sendMessage("§7Suppressed: §f" + plugin.teleports().isSuppressed(data));
+        sender.sendMessage("§7Globally Discovered: §f" + data.globallyDiscovered() + " §7Suppressed: §f" + plugin.teleports().isSuppressed(data));
+        if (sender instanceof Player player) sender.sendMessage("§7Your Discovery State: §f" + plugin.discovery().status(player, data));
     }
 
     private void remove(CommandSender sender) {
@@ -149,7 +155,7 @@ public final class CdrWaystoneCommand implements CommandExecutor, TabCompleter {
         WaystoneData data = targeted(player);
         if (data == null) { sender.sendMessage("§cLook directly at a CdrWaystone within 6 blocks."); return; }
         if (data.isAdmin() && data.permanent()) { sender.sendMessage("§6Use §f/cws admin remove§6 for a permanent Admin Waystone."); return; }
-        plugin.visuals().remove(data); plugin.registry().remove(data);
+        plugin.visuals().remove(data); plugin.registry().remove(data); plugin.discovery().forgetWaystone(data.id());
         sender.sendMessage("§eRegistry entry and visual removed. Lodestone was left in place.");
     }
 
@@ -168,8 +174,8 @@ public final class CdrWaystoneCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) return filter(args[0], List.of("getkey","skin","skins","admin","refresh","reload","info","remove"));
         if (args.length == 2 && args[0].equalsIgnoreCase("skin")) return filter(args[1], new ArrayList<>(plugin.skins().keySet()));
         if (args.length == 2 && args[0].equalsIgnoreCase("getkey")) return filter(args[1], Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList()));
-        if (args.length == 2 && args[0].equalsIgnoreCase("admin")) return filter(args[1], List.of("create","remove","setpublic","setfree","setpermanent","setactive","skin","info"));
-        if (args.length == 3 && args[0].equalsIgnoreCase("admin") && List.of("setpublic","setfree","setpermanent","setactive").contains(args[1].toLowerCase(Locale.ROOT))) return filter(args[2], List.of("true","false"));
+        if (args.length == 2 && args[0].equalsIgnoreCase("admin")) return filter(args[1], List.of("create","remove","setpublic","setfree","setpermanent","setactive","setglobal","skin","info"));
+        if (args.length == 3 && args[0].equalsIgnoreCase("admin") && List.of("setpublic","setfree","setpermanent","setactive","setglobal").contains(args[1].toLowerCase(Locale.ROOT))) return filter(args[2], List.of("true","false"));
         if (args.length == 3 && args[0].equalsIgnoreCase("admin") && args[1].equalsIgnoreCase("skin")) return filter(args[2], new ArrayList<>(plugin.skins().keySet()));
         return Collections.emptyList();
     }
