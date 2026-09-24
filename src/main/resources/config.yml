@@ -1,4 +1,4 @@
-# CdrWaystone v0.4.0
+# CdrWaystone v0.4.1
 # Paper 1.21.11 + Java 21
 
 waystones:
@@ -11,6 +11,11 @@ ownership:
   max-waystones-per-player: 3
   # PRIVATE, TRUSTED, PUBLIC
   default-access: PRIVATE
+
+categories:
+  # CAPITAL, CITY, VILLAGE, DUNGEON, KINGDOM, PLAYER, EVENT, OTHER
+  default-player: PLAYER
+  default-admin: CITY
 
 admin-waystones:
   default-skin: divine
