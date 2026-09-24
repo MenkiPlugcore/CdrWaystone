@@ -79,8 +79,12 @@ public final class WaystoneRegistry {
                 WaystoneData.CoreState coreState = parseCoreState(
                         yaml.getString(path + ".core-state"), WaystoneData.CoreState.ACTIVE);
 
+                // Backward compatibility: all pre-v0.6.1 ACTIVE Waystones begin at AWAKENED.
+                WaystoneData.Tier tier = parseTier(
+                        yaml.getString(path + ".tier"), WaystoneData.Tier.AWAKENED);
+
                 WaystoneData data = new WaystoneData(id, owner, worldId, worldName, x, y, z, name, skin, collisionOwned,
-                        type, publicAccess, freeTravel, permanent, alwaysActive, globallyDiscovered, accessMode, trusted, category, coreState);
+                        type, publicAccess, freeTravel, permanent, alwaysActive, globallyDiscovered, accessMode, trusted, category, coreState, tier);
                 byId.put(id, data);
                 byLocation.put(locationKey(worldId, x, y, z), id);
             } catch (Exception ex) {
@@ -110,6 +114,7 @@ public final class WaystoneRegistry {
             yaml.set(path + ".trusted", data.trustedPlayers().stream().map(UUID::toString).toList());
             yaml.set(path + ".category", data.category().name());
             yaml.set(path + ".core-state", data.coreState().name());
+            yaml.set(path + ".tier", data.tier().name());
         }
         File tempFile = new File(plugin.getDataFolder(), "waystones.yml.tmp");
         try {
@@ -129,14 +134,15 @@ public final class WaystoneRegistry {
         try { mode = WaystoneData.AccessMode.valueOf(plugin.getConfig().getString("ownership.default-access", "PRIVATE").toUpperCase(Locale.ROOT)); }
         catch (IllegalArgumentException ex) { mode = WaystoneData.AccessMode.PRIVATE; }
         return create(owner, location, name, skin, WaystoneData.Type.PLAYER, false, false, false, false, false,
-                mode, Set.of(), defaultPlayerCategory(), defaultPlayerCoreState());
+                mode, Set.of(), defaultPlayerCategory(), defaultPlayerCoreState(), defaultPlayerTier());
     }
 
     public synchronized WaystoneData create(UUID owner, Location location, String name, String skin, WaystoneData.Type type,
                                              boolean publicAccess, boolean freeTravel, boolean permanent, boolean alwaysActive) {
         return create(owner, location, name, skin, type, publicAccess, freeTravel, permanent, alwaysActive, false,
                 WaystoneData.AccessMode.PRIVATE, Set.of(), type == WaystoneData.Type.ADMIN ? defaultAdminCategory() : defaultPlayerCategory(),
-                type == WaystoneData.Type.ADMIN ? defaultAdminCoreState() : defaultPlayerCoreState());
+                type == WaystoneData.Type.ADMIN ? defaultAdminCoreState() : defaultPlayerCoreState(),
+                type == WaystoneData.Type.ADMIN ? defaultAdminTier() : defaultPlayerTier());
     }
 
     public synchronized WaystoneData create(UUID owner, Location location, String name, String skin, WaystoneData.Type type,
@@ -144,7 +150,8 @@ public final class WaystoneRegistry {
                                              boolean alwaysActive, boolean globallyDiscovered) {
         return create(owner, location, name, skin, type, publicAccess, freeTravel, permanent, alwaysActive, globallyDiscovered,
                 WaystoneData.AccessMode.PRIVATE, Set.of(), type == WaystoneData.Type.ADMIN ? defaultAdminCategory() : defaultPlayerCategory(),
-                type == WaystoneData.Type.ADMIN ? defaultAdminCoreState() : defaultPlayerCoreState());
+                type == WaystoneData.Type.ADMIN ? defaultAdminCoreState() : defaultPlayerCoreState(),
+                type == WaystoneData.Type.ADMIN ? defaultAdminTier() : defaultPlayerTier());
     }
 
     public synchronized WaystoneData create(UUID owner, Location location, String name, String skin, WaystoneData.Type type,
@@ -153,7 +160,8 @@ public final class WaystoneRegistry {
                                              WaystoneData.AccessMode accessMode, Set<UUID> trusted) {
         return create(owner, location, name, skin, type, publicAccess, freeTravel, permanent, alwaysActive, globallyDiscovered,
                 accessMode, trusted, type == WaystoneData.Type.ADMIN ? defaultAdminCategory() : defaultPlayerCategory(),
-                type == WaystoneData.Type.ADMIN ? defaultAdminCoreState() : defaultPlayerCoreState());
+                type == WaystoneData.Type.ADMIN ? defaultAdminCoreState() : defaultPlayerCoreState(),
+                type == WaystoneData.Type.ADMIN ? defaultAdminTier() : defaultPlayerTier());
     }
 
     public synchronized WaystoneData create(UUID owner, Location location, String name, String skin, WaystoneData.Type type,
@@ -162,7 +170,8 @@ public final class WaystoneRegistry {
                                              WaystoneData.AccessMode accessMode, Set<UUID> trusted, WaystoneData.Category category) {
         return create(owner, location, name, skin, type, publicAccess, freeTravel, permanent, alwaysActive, globallyDiscovered,
                 accessMode, trusted, category,
-                type == WaystoneData.Type.ADMIN ? defaultAdminCoreState() : defaultPlayerCoreState());
+                type == WaystoneData.Type.ADMIN ? defaultAdminCoreState() : defaultPlayerCoreState(),
+                type == WaystoneData.Type.ADMIN ? defaultAdminTier() : defaultPlayerTier());
     }
 
     public synchronized WaystoneData create(UUID owner, Location location, String name, String skin, WaystoneData.Type type,
@@ -170,10 +179,20 @@ public final class WaystoneRegistry {
                                              boolean alwaysActive, boolean globallyDiscovered,
                                              WaystoneData.AccessMode accessMode, Set<UUID> trusted, WaystoneData.Category category,
                                              WaystoneData.CoreState coreState) {
+        return create(owner, location, name, skin, type, publicAccess, freeTravel, permanent, alwaysActive, globallyDiscovered,
+                accessMode, trusted, category, coreState,
+                type == WaystoneData.Type.ADMIN ? defaultAdminTier() : defaultPlayerTier());
+    }
+
+    public synchronized WaystoneData create(UUID owner, Location location, String name, String skin, WaystoneData.Type type,
+                                             boolean publicAccess, boolean freeTravel, boolean permanent,
+                                             boolean alwaysActive, boolean globallyDiscovered,
+                                             WaystoneData.AccessMode accessMode, Set<UUID> trusted, WaystoneData.Category category,
+                                             WaystoneData.CoreState coreState, WaystoneData.Tier tier) {
         UUID id = UUID.randomUUID();
         WaystoneData data = new WaystoneData(id, owner, location.getWorld().getUID(), location.getWorld().getName(),
                 location.getBlockX(), location.getBlockY(), location.getBlockZ(), name, skin, false,
-                type, publicAccess, freeTravel, permanent, alwaysActive, globallyDiscovered, accessMode, trusted, category, coreState);
+                type, publicAccess, freeTravel, permanent, alwaysActive, globallyDiscovered, accessMode, trusted, category, coreState, tier);
         byId.put(id, data);
         byLocation.put(locationKey(location), id);
         save();
@@ -230,6 +249,14 @@ public final class WaystoneRegistry {
         return parseCoreState(plugin.getConfig().getString("core.new-admin-waystones", "ACTIVE"), WaystoneData.CoreState.ACTIVE);
     }
 
+    private WaystoneData.Tier defaultPlayerTier() {
+        return parseTier(plugin.getConfig().getString("tier.default-player", "AWAKENED"), WaystoneData.Tier.AWAKENED);
+    }
+
+    private WaystoneData.Tier defaultAdminTier() {
+        return parseTier(plugin.getConfig().getString("tier.default-admin", "ASCENDED"), WaystoneData.Tier.ASCENDED);
+    }
+
     private WaystoneData.Category parseCategory(String raw, WaystoneData.Category fallback) {
         if (raw == null || raw.isBlank()) return fallback;
         try { return WaystoneData.Category.valueOf(raw.trim().toUpperCase(Locale.ROOT)); }
@@ -239,6 +266,12 @@ public final class WaystoneRegistry {
     private WaystoneData.CoreState parseCoreState(String raw, WaystoneData.CoreState fallback) {
         if (raw == null || raw.isBlank()) return fallback;
         try { return WaystoneData.CoreState.valueOf(raw.trim().toUpperCase(Locale.ROOT)); }
+        catch (IllegalArgumentException ignored) { return fallback; }
+    }
+
+    private WaystoneData.Tier parseTier(String raw, WaystoneData.Tier fallback) {
+        if (raw == null || raw.isBlank()) return fallback;
+        try { return WaystoneData.Tier.valueOf(raw.trim().toUpperCase(Locale.ROOT)); }
         catch (IllegalArgumentException ignored) { return fallback; }
     }
 
