@@ -107,7 +107,23 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     }
 
     private void mergeConfigDefaults() {
+        migrateLegacy061Config();
         getConfig().options().copyDefaults(true);
+        saveConfig();
+    }
+
+    private void migrateLegacy061Config() {
+        if (!getConfig().contains("tier")) return;
+
+        getLogger().info("Migrating v0.6.1 tier configuration to v0.6.2 simplified Waystone travel.");
+        getConfig().set("tier", null);
+        getConfig().set("key.relinkable", null);
+
+        String provider = getConfig().getString("economy.provider", "AUTO");
+        if (provider == null || provider.equalsIgnoreCase("AUTO")) {
+            getConfig().set("economy.provider", "VAULT");
+        }
+
         saveConfig();
     }
 
