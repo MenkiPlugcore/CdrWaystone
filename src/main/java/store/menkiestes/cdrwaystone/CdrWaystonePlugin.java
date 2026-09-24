@@ -18,13 +18,14 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     private KeyService keys;
     private CoreService cores;
     private VisualService visuals;
+    private FeedbackService feedback;
+    private TeleportEffectService effects;
     private EconomyService economy;
     private TravelGuardService guards;
     private TeleportService teleports;
     private MaintenanceService maintenance;
     private DiscoveryService discovery;
     private AccessService access;
-    private WaystoneGui gui;
     private NetworkGui networkGui;
     private Map<String, String> skins = new LinkedHashMap<>();
 
@@ -35,11 +36,13 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         saveResourceIfMissing("skins.yml");
 
         loadSkins();
+        feedback = new FeedbackService();
         registry = new WaystoneRegistry(this);
         registry.load();
         keys = new KeyService(this);
         cores = new CoreService(this);
         visuals = new VisualService(this);
+        effects = new TeleportEffectService(this);
         access = new AccessService(this);
         economy = new EconomyService(this);
         guards = new TravelGuardService(this);
@@ -47,11 +50,9 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         maintenance = new MaintenanceService(this);
         discovery = new DiscoveryService(this);
         discovery.load();
-        gui = new WaystoneGui(this);
         networkGui = new NetworkGui(this);
 
         getServer().getPluginManager().registerEvents(new WaystoneListener(this), this);
-        getServer().getPluginManager().registerEvents(gui, this);
         getServer().getPluginManager().registerEvents(networkGui, this);
 
         CdrWaystoneCommand commandHandler = new CdrWaystoneCommand(this);
@@ -78,7 +79,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
 
         getLogger().info("CdrWaystone v" + getPluginMeta().getVersion()
                 + " enabled with " + skins.size() + " skin(s). Economy: " + economy.providerLabel()
-                + ". Travel mode: WAYSTONE_TO_WAYSTONE");
+                + ". Travel mode: WAYSTONE_TO_WAYSTONE. Player chat output: OFF");
     }
 
     @Override
@@ -88,6 +89,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
             discovery.save();
         }
         if (maintenance != null) maintenance.stop();
+        if (effects != null) effects.stopAll();
         if (teleports != null) teleports.cancelAll();
         if (registry != null) registry.save();
         if (visuals != null) visuals.removeAllVisualEntities();
@@ -101,6 +103,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         if (guards != null) guards.reload();
         registerKeyRecipe();
         if (cores != null) cores.registerRecipe();
+        if (effects != null) effects.stopAll();
         visuals.refreshAllLoaded();
         if (maintenance != null) maintenance.start();
         if (discovery != null) discovery.start();
@@ -115,7 +118,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     private void migrateLegacy061Config() {
         if (!getConfig().contains("tier")) return;
 
-        getLogger().info("Migrating v0.6.1 tier configuration to v0.6.2 simplified Waystone travel.");
+        getLogger().info("Migrating v0.6.1 tier configuration to simplified Waystone travel.");
         getConfig().set("tier", null);
         getConfig().set("key.relinkable", null);
 
@@ -162,13 +165,14 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     public KeyService keys() { return keys; }
     public CoreService cores() { return cores; }
     public VisualService visuals() { return visuals; }
+    public FeedbackService feedback() { return feedback; }
+    public TeleportEffectService effects() { return effects; }
     public EconomyService economy() { return economy; }
     public TravelGuardService guards() { return guards; }
     public TeleportService teleports() { return teleports; }
     public MaintenanceService maintenance() { return maintenance; }
     public DiscoveryService discovery() { return discovery; }
     public AccessService access() { return access; }
-    public WaystoneGui gui() { return gui; }
     public NetworkGui networkGui() { return networkGui; }
     public Map<String, String> skins() { return skins; }
 }
