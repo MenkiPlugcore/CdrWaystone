@@ -20,6 +20,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     private TeleportService teleports;
     private MaintenanceService maintenance;
     private DiscoveryService discovery;
+    private AccessService access;
     private WaystoneGui gui;
     private Map<String, String> skins = new LinkedHashMap<>();
 
@@ -34,6 +35,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         registry.load();
         keys = new KeyService(this);
         visuals = new VisualService(this);
+        access = new AccessService(this);
         teleports = new TeleportService(this);
         maintenance = new MaintenanceService(this);
         discovery = new DiscoveryService(this);
@@ -122,6 +124,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     public TeleportService teleports() { return teleports; }
     public MaintenanceService maintenance() { return maintenance; }
     public DiscoveryService discovery() { return discovery; }
+    public AccessService access() { return access; }
     public WaystoneGui gui() { return gui; }
     public Map<String, String> skins() { return skins; }
 }
