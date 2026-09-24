@@ -2,28 +2,34 @@ package store.menkiestes.cdrwaystone;
 
 import org.bukkit.*;
 import org.bukkit.block.Block;
-import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
-import org.bukkit.entity.ItemDisplay;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.util.Transformation;
-import org.joml.AxisAngle4f;
-import org.joml.Quaternionf;
-import org.joml.Vector3f;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
+import java.util.UUID;
 
+/**
+ * v0.6.4 furniture renderer.
+ *
+ * The Lodestone is only a staff placement trigger. Registered Waystones are
+ * represented in-world by ItemsAdder CustomFurniture plus invisible Barrier
+ * anchors for reliable Bukkit interaction/collision.
+ */
 public final class VisualService {
     private final CdrWaystonePlugin plugin;
     private final NamespacedKey visualMarker;
     private final NamespacedKey visualIdMarker;
-    private Method customStackGetInstance;
-    private Method customStackGetItemStack;
+
+    private Class<?> customFurnitureClass;
+    private Method furnitureSpawnPrecise;
+    private Method furnitureSpawnBlock;
+    private Method furnitureByEntity;
+    private Method furnitureGetEntity;
+    private Method furnitureGetArmorstand;
+    private Method furnitureRemove;
 
     public VisualService(CdrWaystonePlugin plugin) {
         this.plugin = plugin;
@@ -31,6 +37,10 @@ public final class VisualService {
         this.visualIdMarker = new NamespacedKey(plugin, "waystone_visual_id");
     }
 
+    /**
+     * Rebuild all loaded Waystone furniture. Legacy registered Lodestones are
+     * migrated automatically. Unregistered vanilla Lodestones are untouched.
+     */
     public void refreshAllLoaded() {
         removeAllVisualEntities();
         List<WaystoneData> invalid = new ArrayList<>();
@@ -38,64 +48,79 @@ public final class VisualService {
         for (WaystoneData data : plugin.registry().all()) {
             Location location = data.location();
             if (location == null || !isChunkLoaded(location)) continue;
-            if (location.getBlock().getType() != Material.LODESTONE) {
+
+            Material baseType = location.getBlock().getType();
+            if (baseType != Material.LODESTONE && baseType != Material.BARRIER && baseType != Material.AIR) {
                 removeCollision(data);
                 invalid.add(data);
                 continue;
             }
-            ensureCollision(data);
-            spawn(data);
+
+            if (!materialize(data)) {
+                plugin.getLogger().warning("Could not materialize Waystone " + data.id()
+                        + ". The registry entry was kept for a later retry.");
+            }
         }
 
         if (!invalid.isEmpty()) {
             for (WaystoneData data : invalid) plugin.registry().remove(data, false);
             plugin.registry().save();
-            plugin.getLogger().warning("Pruned " + invalid.size() + " stale Waystone registry entr" + (invalid.size() == 1 ? "y." : "ies."));
+            plugin.getLogger().warning("Pruned " + invalid.size() + " obstructed Waystone registry entr"
+                    + (invalid.size() == 1 ? "y." : "ies."));
         }
     }
 
-    public void spawn(WaystoneData data) {
-        if (!plugin.getConfig().getBoolean("visuals.enabled", true)) {
-            removeVisual(data);
-            return;
-        }
+    /**
+     * Converts/rebuilds a registered Waystone into native ItemsAdder furniture.
+     * Returns false without deleting the original Lodestone when ItemsAdder
+     * cannot spawn the furniture.
+     */
+    public boolean materialize(WaystoneData data) {
+        if (!plugin.getConfig().getBoolean("visuals.enabled", true)) return false;
         Location base = data.location();
-        if (base == null || !isChunkLoaded(base)) return;
-        if (base.getBlock().getType() != Material.LODESTONE) return;
+        if (base == null || !isChunkLoaded(base)) return false;
+
+        Block baseBlock = base.getBlock();
+        Block topBlock = baseBlock.getRelative(0, 1, 0);
+        Material originalBase = baseBlock.getType();
+        Material originalTop = topBlock.getType();
+
+        if (originalBase != Material.LODESTONE && originalBase != Material.BARRIER && originalBase != Material.AIR) {
+            return false;
+        }
+        if (originalTop != Material.AIR && originalTop != Material.BARRIER) {
+            plugin.getLogger().warning("Cannot render Waystone " + data.id()
+                    + " because its upper hitbox is occupied by " + originalTop + ".");
+            return false;
+        }
+
+        String furnitureId = furnitureId(data);
+        if (furnitureId == null || furnitureId.isBlank()) return false;
 
         removeVisual(data);
-        String itemId = plugin.skins().get(data.skin());
-        if (itemId == null) itemId = plugin.skins().get(plugin.getConfig().getString("visuals.default-skin", "andesite"));
-        ItemStack modelItem = getItemsAdderItem(itemId);
-        if (modelItem == null) {
-            plugin.getLogger().warning("ItemsAdder model not available: " + itemId + " (waystone " + data.id() + ")");
-            return;
+
+        // ItemsAdder needs the target space available while it creates the furniture.
+        if (baseBlock.getType() == Material.LODESTONE || baseBlock.getType() == Material.BARRIER) {
+            baseBlock.setType(Material.AIR, false);
+        }
+        if (topBlock.getType() == Material.BARRIER) topBlock.setType(Material.AIR, false);
+
+        Entity entity = spawnFurniture(furnitureId, base);
+        if (entity == null) {
+            // Never eat the placement trigger when the visual provider is unavailable.
+            baseBlock.setType(originalBase == Material.LODESTONE ? Material.LODESTONE : originalBase, false);
+            if (originalTop == Material.BARRIER) topBlock.setType(Material.BARRIER, false);
+            return false;
         }
 
-        double yOffset = plugin.getConfig().getDouble("visuals.model-y-offset", 0.5);
-        float rotation = (float) Math.toRadians(plugin.getConfig().getDouble("visuals.rotation-degrees", 0.0));
-        float viewRange = (float) plugin.getConfig().getDouble("visuals.view-range", 1.5);
-        float scale = (float) Math.max(0.05, plugin.getConfig().getDouble("visuals.scale", 1.0));
-        ItemDisplay.ItemDisplayTransform transform = configuredTransform();
-        Location spawnAt = base.clone().add(0.5, yOffset, 0.5);
+        markFurniture(entity, data.id());
+        ensureCollision(data);
+        return true;
+    }
 
-        base.getWorld().spawn(spawnAt, ItemDisplay.class, display -> {
-            display.setItemStack(modelItem);
-            display.setItemDisplayTransform(transform);
-            display.setBillboard(Display.Billboard.FIXED);
-            display.setViewRange(viewRange);
-            display.setPersistent(false);
-            display.getPersistentDataContainer().set(visualMarker, PersistentDataType.BYTE, (byte) 1);
-            display.getPersistentDataContainer().set(visualIdMarker, PersistentDataType.STRING, data.id().toString());
-
-            Transformation old = display.getTransformation();
-            display.setTransformation(new Transformation(
-                    old.getTranslation(),
-                    new Quaternionf(new AxisAngle4f(rotation, 0f, 1f, 0f)),
-                    new Vector3f(scale, scale, scale),
-                    old.getRightRotation()
-            ));
-        });
+    /** Existing callers (skin changes, chunk restoration) now rebuild furniture. */
+    public void spawn(WaystoneData data) {
+        materialize(data);
     }
 
     public boolean hasVisual(WaystoneData data) {
@@ -103,11 +128,29 @@ public final class VisualService {
         if (base == null || !isChunkLoaded(base)) return false;
         String id = data.id().toString();
         Location center = base.clone().add(0.5, 1.0, 0.5);
-        for (Entity entity : base.getWorld().getNearbyEntities(center, 1.25, 3.0, 1.25)) {
+        for (Entity entity : base.getWorld().getNearbyEntities(center, 2.0, 3.0, 2.0)) {
             String visualId = entity.getPersistentDataContainer().get(visualIdMarker, PersistentDataType.STRING);
             if (id.equals(visualId) && isOurVisual(entity)) return true;
         }
         return false;
+    }
+
+    public boolean isAnchorValid(WaystoneData data) {
+        Location location = data == null ? null : data.location();
+        if (location == null || location.getWorld() == null) return false;
+        Material type = location.getBlock().getType();
+        return type == Material.BARRIER || type == Material.LODESTONE;
+    }
+
+    public WaystoneData waystoneFromEntity(Entity entity) {
+        if (entity == null || !isOurVisual(entity)) return null;
+        String raw = entity.getPersistentDataContainer().get(visualIdMarker, PersistentDataType.STRING);
+        if (raw == null) return null;
+        try {
+            return plugin.registry().get(UUID.fromString(raw));
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     public void remove(WaystoneData data) {
@@ -120,99 +163,166 @@ public final class VisualService {
         if (base == null || !isChunkLoaded(base)) return;
         String id = data.id().toString();
         Location center = base.clone().add(0.5, 1.0, 0.5);
-        for (Entity entity : base.getWorld().getNearbyEntities(center, 1.25, 3.0, 1.25)) {
+        for (Entity entity : new ArrayList<>(base.getWorld().getNearbyEntities(center, 2.0, 3.0, 2.0))) {
             if (!isOurVisual(entity)) continue;
             String visualId = entity.getPersistentDataContainer().get(visualIdMarker, PersistentDataType.STRING);
-            if (id.equals(visualId)) {
-                entity.remove();
-                continue;
-            }
-            if (visualId == null) {
-                Location entityLoc = entity.getLocation();
-                double dx = entityLoc.getX() - (base.getBlockX() + 0.5);
-                double dz = entityLoc.getZ() - (base.getBlockZ() + 0.5);
-                if ((dx * dx + dz * dz) <= 0.36) entity.remove();
-            }
+            if (id.equals(visualId)) removeFurnitureEntity(entity);
         }
     }
 
     public void removeAllVisualEntities() {
         for (World world : Bukkit.getWorlds()) {
-            for (ItemDisplay entity : world.getEntitiesByClass(ItemDisplay.class)) {
-                if (isOurVisual(entity)) entity.remove();
+            for (Entity entity : new ArrayList<>(world.getEntities())) {
+                if (isOurVisual(entity)) removeFurnitureEntity(entity);
             }
         }
     }
 
-    private boolean isChunkLoaded(Location location) {
-        return location.getWorld() != null && location.getWorld().isChunkLoaded(location.getBlockX() >> 4, location.getBlockZ() >> 4);
-    }
-
-    private boolean isOurVisual(Entity entity) {
+    public boolean isOurVisual(Entity entity) {
+        if (entity == null) return false;
         Byte value = entity.getPersistentDataContainer().get(visualMarker, PersistentDataType.BYTE);
         return value != null && value == (byte) 1;
     }
 
+    /**
+     * The registered location itself and one block above it become invisible
+     * anchors. The visible object is the ItemsAdder furniture only.
+     */
     public void ensureCollision(WaystoneData data) {
         Location base = data.location();
         if (base == null || !isChunkLoaded(base)) return;
-        if (base.getBlock().getType() != Material.LODESTONE) return;
-
         if (!plugin.getConfig().getBoolean("collision.enabled", true)) {
             removeCollision(data);
             return;
         }
 
-        Block top = base.clone().add(0, 1, 0).getBlock();
-        Material current = top.getType();
-        if (current == Material.AIR) {
-            top.setType(Material.BARRIER, false);
-            if (!data.collisionOwned()) {
-                data.collisionOwned(true);
-                plugin.registry().save();
-            }
-        } else if (current != Material.BARRIER && data.collisionOwned()) {
-            data.collisionOwned(false);
+        Block bottom = base.getBlock();
+        Block top = bottom.getRelative(0, 1, 0);
+
+        if (bottom.getType() == Material.LODESTONE || bottom.getType() == Material.AIR) {
+            bottom.setType(Material.BARRIER, false);
+        }
+        if (top.getType() == Material.AIR) top.setType(Material.BARRIER, false);
+
+        boolean owned = bottom.getType() == Material.BARRIER && top.getType() == Material.BARRIER;
+        if (data.collisionOwned() != owned) {
+            data.collisionOwned(owned);
             plugin.registry().save();
-            plugin.getLogger().warning("Collision disabled for Waystone " + data.id() + " because the block above it is occupied by " + current + ".");
         }
     }
 
     public void removeCollision(WaystoneData data) {
-        if (!data.collisionOwned()) return;
         Location base = data.location();
         if (base == null || !isChunkLoaded(base)) return;
-        Block top = base.clone().add(0, 1, 0).getBlock();
+        Block bottom = base.getBlock();
+        Block top = bottom.getRelative(0, 1, 0);
+        if (bottom.getType() == Material.BARRIER) bottom.setType(Material.AIR, false);
         if (top.getType() == Material.BARRIER) top.setType(Material.AIR, false);
-        data.collisionOwned(false);
+        if (data.collisionOwned()) data.collisionOwned(false);
     }
 
-    private ItemDisplay.ItemDisplayTransform configuredTransform() {
-        String raw = plugin.getConfig().getString("visuals.display-transform", "FIXED");
-        if (raw == null) return ItemDisplay.ItemDisplayTransform.FIXED;
-        try {
-            return ItemDisplay.ItemDisplayTransform.valueOf(raw.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException ignored) {
-            plugin.getLogger().warning("Unknown visuals.display-transform '" + raw + "'. Using FIXED.");
-            return ItemDisplay.ItemDisplayTransform.FIXED;
+    private String furnitureId(WaystoneData data) {
+        String itemId = plugin.skins().get(data.skin());
+        if (itemId == null) {
+            itemId = plugin.skins().get(plugin.getConfig().getString("visuals.default-skin", "andesite"));
         }
+        return itemId;
     }
 
-    private ItemStack getItemsAdderItem(String id) {
+    private Entity spawnFurniture(String id, Location base) {
         Plugin itemsAdder = Bukkit.getPluginManager().getPlugin("ItemsAdder");
-        if (id == null || itemsAdder == null || !itemsAdder.isEnabled()) return null;
-        try {
-            if (customStackGetInstance == null || customStackGetItemStack == null) {
-                Class<?> clazz = Class.forName("dev.lone.itemsadder.api.CustomStack");
-                customStackGetInstance = clazz.getMethod("getInstance", String.class);
-                customStackGetItemStack = clazz.getMethod("getItemStack");
-            }
-            Object customStack = customStackGetInstance.invoke(null, id);
-            if (customStack == null) return null;
-            return ((ItemStack) customStackGetItemStack.invoke(customStack)).clone();
-        } catch (ReflectiveOperationException ex) {
-            plugin.getLogger().warning("Could not read ItemsAdder CustomStack " + id + ": " + ex.getMessage());
+        if (itemsAdder == null || !itemsAdder.isEnabled()) {
+            plugin.getLogger().warning("ItemsAdder is not available; cannot spawn Waystone furniture " + id + ".");
             return null;
         }
+
+        try {
+            prepareFurnitureApi();
+            Object furniture = null;
+
+            // Preferred for our non-solid furniture definitions: exact floor-centred placement.
+            if (furnitureSpawnPrecise != null) {
+                Location precise = base.clone().add(0.5, 0.0, 0.5);
+                precise.setYaw((float) plugin.getConfig().getDouble("visuals.rotation-degrees", 0.0));
+                furniture = furnitureSpawnPrecise.invoke(null, id, precise);
+            }
+
+            // Compatibility fallback for ItemsAdder builds without precise spawning.
+            if (furniture == null && furnitureSpawnBlock != null) {
+                furniture = furnitureSpawnBlock.invoke(null, id, base.getBlock());
+            }
+            if (furniture == null) {
+                plugin.getLogger().warning("ItemsAdder could not spawn furniture: " + id);
+                return null;
+            }
+
+            Entity entity = null;
+            if (furnitureGetEntity != null) {
+                Object result = furnitureGetEntity.invoke(furniture);
+                if (result instanceof Entity found) entity = found;
+            }
+            if (entity == null && furnitureGetArmorstand != null) {
+                Object result = furnitureGetArmorstand.invoke(furniture);
+                if (result instanceof Entity found) entity = found;
+            }
+            return entity;
+        } catch (ReflectiveOperationException ex) {
+            plugin.getLogger().warning("Could not use ItemsAdder CustomFurniture API for " + id + ": " + ex.getMessage());
+            return null;
+        }
+    }
+
+    private void prepareFurnitureApi() throws ReflectiveOperationException {
+        if (customFurnitureClass != null) return;
+        customFurnitureClass = Class.forName("dev.lone.itemsadder.api.CustomFurniture");
+
+        try {
+            furnitureSpawnPrecise = customFurnitureClass.getMethod("spawnPreciseNonSolid", String.class, Location.class);
+        } catch (NoSuchMethodException ignored) {
+            furnitureSpawnPrecise = null;
+        }
+        try {
+            furnitureSpawnBlock = customFurnitureClass.getMethod("spawn", String.class, Block.class);
+        } catch (NoSuchMethodException ignored) {
+            furnitureSpawnBlock = null;
+        }
+        furnitureByEntity = customFurnitureClass.getMethod("byAlreadySpawned", Entity.class);
+        try {
+            furnitureGetEntity = customFurnitureClass.getMethod("getEntity");
+        } catch (NoSuchMethodException ignored) {
+            furnitureGetEntity = null;
+        }
+        try {
+            furnitureGetArmorstand = customFurnitureClass.getMethod("getArmorstand");
+        } catch (NoSuchMethodException ignored) {
+            furnitureGetArmorstand = null;
+        }
+        furnitureRemove = customFurnitureClass.getMethod("remove", boolean.class);
+    }
+
+    private void markFurniture(Entity entity, UUID waystoneId) {
+        entity.getPersistentDataContainer().set(visualMarker, PersistentDataType.BYTE, (byte) 1);
+        entity.getPersistentDataContainer().set(visualIdMarker, PersistentDataType.STRING, waystoneId.toString());
+        entity.setInvulnerable(true);
+        entity.setPersistent(false);
+    }
+
+    private void removeFurnitureEntity(Entity entity) {
+        try {
+            prepareFurnitureApi();
+            Object furniture = furnitureByEntity.invoke(null, entity);
+            if (furniture != null) {
+                furnitureRemove.invoke(furniture, false);
+                return;
+            }
+        } catch (ReflectiveOperationException ignored) {
+            // Fallback below also cleans legacy v0.6.3 Bukkit ItemDisplays.
+        }
+        entity.remove();
+    }
+
+    private boolean isChunkLoaded(Location location) {
+        return location.getWorld() != null
+                && location.getWorld().isChunkLoaded(location.getBlockX() >> 4, location.getBlockZ() >> 4);
     }
 }
