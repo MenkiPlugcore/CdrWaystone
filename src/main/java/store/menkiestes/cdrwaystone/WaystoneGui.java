@@ -56,12 +56,15 @@ public final class WaystoneGui implements Listener {
             inv.setItem(20, head);
         }
 
+        DiscoveryService.State discoveryState = plugin.discovery().status(player, data);
+        inv.setItem(21, discoveryItem(discoveryState));
+
         boolean suppressed = plugin.teleports().isSuppressed(data);
         inv.setItem(22, item(suppressed ? Material.REDSTONE_TORCH : Material.LIME_DYE,
-                suppressed ? "Suppressed" : (data.alwaysActive() ? "Always Active" : "Active"),
+                suppressed ? "Suppressed" : (data.alwaysActive() ? "Always Active" : "Online"),
                 suppressed ? NamedTextColor.RED : NamedTextColor.GREEN,
-                data.alwaysActive() ? "Server override keeps this Waystone online" : (suppressed ? "Travel to this Waystone is disabled" : "Waystone is online"),
-                data.alwaysActive() ? "Suppression and power requirements bypassed" : (suppressed ? "Remove the suppressor block below it" : "Ready for binding and travel")));
+                data.alwaysActive() ? "Server override keeps this Waystone online" : (suppressed ? "Travel to this Waystone is disabled" : "Waystone is operational"),
+                data.alwaysActive() ? "Suppression and power requirements bypassed" : (suppressed ? "Remove the suppressor block below it" : "Activation is tracked per player")));
 
         inv.setItem(24, powerItem(data));
         inv.setItem(29, item(Material.AMETHYST_SHARD, "Skin Gallery", NamedTextColor.LIGHT_PURPLE,
@@ -69,7 +72,8 @@ public final class WaystoneGui implements Listener {
         inv.setItem(31, item(Material.NAME_TAG, "Rename Waystone", NamedTextColor.AQUA,
                 "Rename a Name Tag in an Anvil", "then right-click this Waystone", canManageSilently(player, data) ? "You may rename this Waystone" : "Owner/Admin only"));
         inv.setItem(33, item(Material.COMPASS, "Waystone Key", NamedTextColor.YELLOW,
-                "Right-click with an unbound key to bind", "Sneak + right-click to relink", "Use the bound key elsewhere to warp"));
+                discoveryState == DiscoveryService.State.ACTIVATED ? "This Waystone is ready for Key binding" : "Activate this Waystone before binding a Key",
+                "Sneak + right-click to relink", "Use the bound key elsewhere to warp"));
         inv.setItem(38, item(Material.MAP, "Coordinates", NamedTextColor.AQUA,
                 data.worldName(), "X " + data.x() + "  Y " + data.y() + "  Z " + data.z()));
         inv.setItem(40, item(Material.CLOCK, "Travel Rules", NamedTextColor.YELLOW,
@@ -82,6 +86,7 @@ public final class WaystoneGui implements Listener {
             inv.setItem(42, item(Material.BEACON, "Admin Waystone Controls", NamedTextColor.GOLD,
                     "Public: " + yesNo(data.publicAccess()), "Free: " + yesNo(data.freeTravel()),
                     "Permanent: " + yesNo(data.permanent()), "Always Active: " + yesNo(data.alwaysActive()),
+                    "Global Discovery: " + yesNo(data.globallyDiscovered()),
                     player.hasPermission("cdrwaystone.admin") ? "Click to configure" : "Administrator only"));
         } else {
             inv.setItem(42, item(player.hasPermission("cdrwaystone.admin") ? Material.NETHER_STAR : Material.IRON_BARS,
@@ -102,11 +107,13 @@ public final class WaystoneGui implements Listener {
         paintFrame(inv, true);
         inv.setItem(4, item(Material.NETHER_STAR, data.name(), NamedTextColor.GOLD, "Official server infrastructure", "Changes save instantly"));
         inv.setItem(20, item(data.publicAccess() ? Material.LIME_DYE : Material.RED_DYE, "Public Access", data.publicAccess() ? NamedTextColor.GREEN : NamedTextColor.RED,
-                "Current: " + yesNo(data.publicAccess()), "Allow normal players to bind/travel", "Click to toggle"));
+                "Current: " + yesNo(data.publicAccess()), "Allow normal players to discover, bind and travel", "Click to toggle"));
         inv.setItem(22, item(data.freeTravel() ? Material.EMERALD : Material.COAL, "Free Travel", data.freeTravel() ? NamedTextColor.GREEN : NamedTextColor.GRAY,
                 "Current: " + yesNo(data.freeTravel()), "Marks this Waystone as cost-free", "Click to toggle"));
         inv.setItem(24, item(data.permanent() ? Material.BEDROCK : Material.IRON_PICKAXE, "Permanent", data.permanent() ? NamedTextColor.GOLD : NamedTextColor.GRAY,
                 "Current: " + yesNo(data.permanent()), "Permanent Waystones cannot be broken", "Click to toggle"));
+        inv.setItem(28, item(data.globallyDiscovered() ? Material.ENDER_EYE : Material.ENDER_PEARL, "Globally Discovered", data.globallyDiscovered() ? NamedTextColor.AQUA : NamedTextColor.GRAY,
+                "Current: " + yesNo(data.globallyDiscovered()), "YES makes this Waystone discovered for everyone", "Players still activate it individually", "Click to toggle"));
         inv.setItem(30, item(data.alwaysActive() ? Material.BEACON : Material.REDSTONE_LAMP, "Always Active", data.alwaysActive() ? NamedTextColor.AQUA : NamedTextColor.GRAY,
                 "Current: " + yesNo(data.alwaysActive()), "Bypass suppression and power requirement", "Click to toggle"));
         inv.setItem(32, item(Material.AMETHYST_SHARD, "Skin Gallery", NamedTextColor.LIGHT_PURPLE, "Current: " + pretty(data.skin()), "Click to choose a model"));
@@ -146,9 +153,22 @@ public final class WaystoneGui implements Listener {
 
         if (holder.screen==Screen.MAIN) {
             switch(event.getRawSlot()) {
+                case 21 -> {
+                    DiscoveryService.State state = plugin.discovery().status(player, data);
+                    if (state == DiscoveryService.State.DISCOVERED) {
+                        plugin.discovery().activate(player, data);
+                        openMain(player, data);
+                    } else if (state == DiscoveryService.State.ACTIVATED) {
+                        player.sendMessage("§aThis Waystone is already activated.");
+                        click(player);
+                    } else {
+                        player.sendMessage("§7Discover this Waystone before activating it.");
+                        click(player);
+                    }
+                }
                 case 29 -> { if (canManage(player,data)) openSkins(player,data); }
                 case 31 -> { player.closeInventory(); if (canManage(player,data)) player.sendMessage("§bRename: §frename a Name Tag in an Anvil, then right-click this Waystone with it."); }
-                case 33 -> { player.closeInventory(); player.sendMessage("§eWaystone Key: §fright-click to bind, sneak + right-click to relink, then use the key elsewhere to warp."); }
+                case 33 -> { player.closeInventory(); player.sendMessage("§eWaystone Key: §factivate a Waystone first, right-click with a Key to bind, sneak + right-click to relink, then use it elsewhere to warp."); }
                 case 42 -> { if (data.isAdmin() && player.hasPermission("cdrwaystone.admin")) openAdmin(player,data); else click(player); }
                 case 49 -> player.closeInventory();
                 default -> click(player);
@@ -162,6 +182,7 @@ public final class WaystoneGui implements Listener {
                 case 20 -> data.publicAccess(!data.publicAccess());
                 case 22 -> data.freeTravel(!data.freeTravel());
                 case 24 -> data.permanent(!data.permanent());
+                case 28 -> data.globallyDiscovered(!data.globallyDiscovered());
                 case 30 -> data.alwaysActive(!data.alwaysActive());
                 case 32 -> { openSkins(player,data); return; }
                 case 36 -> { openMain(player,data); return; }
@@ -183,6 +204,17 @@ public final class WaystoneGui implements Listener {
     }
 
     @EventHandler public void onDrag(InventoryDragEvent event) { if (event.getView().getTopInventory().getHolder() instanceof GuiHolder) event.setCancelled(true); }
+
+    private ItemStack discoveryItem(DiscoveryService.State state) {
+        return switch (state) {
+            case UNKNOWN -> item(Material.GRAY_DYE, "Unknown", NamedTextColor.DARK_GRAY,
+                    "This Waystone has not been discovered", "Move close to it to reveal it");
+            case DISCOVERED -> item(Material.AMETHYST_SHARD, "Discovered", NamedTextColor.LIGHT_PURPLE,
+                    "You have found this Waystone", "Click to ACTIVATE it", "Activation unlocks Key binding and travel");
+            case ACTIVATED -> item(Material.ENDER_EYE, "Activated", NamedTextColor.GREEN,
+                    "This Waystone is attuned to you", "Key binding and travel unlocked");
+        };
+    }
 
     private boolean canManage(Player player, WaystoneData data) {
         if (canManageSilently(player,data)) return true;
