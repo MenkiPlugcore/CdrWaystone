@@ -28,9 +28,14 @@ public final class KeyService {
         if (material == null) material = Material.COMPASS;
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(miniMessage.deserialize(plugin.getConfig().getString("key.name", "<light_purple>Waystone Key</light_purple>")));
-        meta.lore(List.of(Component.text("Unbound"), Component.text("Right-click a CdrWaystone to bind")));
+        meta.displayName(miniMessage.deserialize(plugin.getConfig().getString("key.name", "<light_purple>Waystone Network Key</light_purple>")));
+        meta.lore(List.of(
+                Component.text("Use at an activated CdrWaystone"),
+                Component.text("to open the Waystone Network"),
+                Component.text("Travel only works Waystone to Waystone")
+        ));
         meta.getPersistentDataContainer().set(keyMarker, PersistentDataType.BYTE, (byte) 1);
+        meta.getPersistentDataContainer().remove(targetMarker);
         item.setItemMeta(meta);
         return item;
     }
@@ -41,6 +46,10 @@ public final class KeyService {
         return value != null && value == (byte) 1;
     }
 
+    /**
+     * Legacy target reader retained so old v0.6.1 keys remain recognizable.
+     * Remote-target teleporting is intentionally disabled in v0.6.2.
+     */
     public UUID target(ItemStack item) {
         if (!isKey(item)) return null;
         String raw = item.getItemMeta().getPersistentDataContainer().get(targetMarker, PersistentDataType.STRING);
@@ -48,10 +57,18 @@ public final class KeyService {
         try { return UUID.fromString(raw); } catch (IllegalArgumentException ignored) { return null; }
     }
 
-    public void bind(ItemStack item, WaystoneData data) {
+    /**
+     * Converts an existing key into the v0.6.2 network-only form.
+     */
+    public void clearLegacyBinding(ItemStack item) {
+        if (!isKey(item)) return;
         ItemMeta meta = item.getItemMeta();
-        meta.getPersistentDataContainer().set(targetMarker, PersistentDataType.STRING, data.id().toString());
-        meta.lore(List.of(Component.text("Bound to: " + data.name()), Component.text(data.worldName() + " " + data.x() + ", " + data.y() + ", " + data.z())));
+        meta.getPersistentDataContainer().remove(targetMarker);
+        meta.lore(List.of(
+                Component.text("Use at an activated CdrWaystone"),
+                Component.text("to open the Waystone Network"),
+                Component.text("Travel only works Waystone to Waystone")
+        ));
         item.setItemMeta(meta);
     }
 }
