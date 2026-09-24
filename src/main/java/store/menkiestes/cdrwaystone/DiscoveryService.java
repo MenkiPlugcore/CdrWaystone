@@ -51,9 +51,7 @@ public final class DiscoveryService {
                         UUID waystoneId = UUID.fromString(rawWaystone);
                         State state = State.valueOf(entries.getString(rawWaystone, "UNKNOWN").toUpperCase(Locale.ROOT));
                         if (state != State.UNKNOWN) states.put(waystoneId, state);
-                    } catch (Exception ignored) {
-                        // Ignore malformed per-waystone discovery records without dropping the player's valid records.
-                    }
+                    } catch (Exception ignored) {}
                 }
                 if (!states.isEmpty()) playerStates.put(playerId, states);
             } catch (IllegalArgumentException ignored) {
@@ -108,12 +106,13 @@ public final class DiscoveryService {
         if (data.owner() != null && data.owner().equals(player.getUniqueId())) return State.ACTIVATED;
         State stored = storedState(player.getUniqueId(), data.id());
         if (stored != State.UNKNOWN) return stored;
-        if (data.isAdmin() && data.globallyDiscovered()) return State.DISCOVERED;
+        if (data.isAdmin() && data.globallyDiscovered() && plugin.access().canAccess(player, data)) return State.DISCOVERED;
         return State.UNKNOWN;
     }
 
     public boolean canUse(Player player, WaystoneData data) {
-        return player.hasPermission("cdrwaystone.admin") || status(player, data) == State.ACTIVATED;
+        if (player.hasPermission("cdrwaystone.admin")) return true;
+        return plugin.access().canAccess(player, data) && status(player, data) == State.ACTIVATED;
     }
 
     public boolean discover(Player player, WaystoneData data, boolean notify) {
@@ -127,12 +126,12 @@ public final class DiscoveryService {
 
     public boolean activate(Player player, WaystoneData data) {
         if (!plugin.getConfig().getBoolean("discovery.enabled", true)) return true;
-        if (!player.hasPermission("cdrwaystone.admin") && status(player, data) == State.UNKNOWN) {
-            player.sendMessage("§7You have not discovered this Waystone yet.");
+        if (!plugin.access().canAccess(player, data)) {
+            player.sendMessage("§cYou do not have access to this Waystone.");
             return false;
         }
-        if (data.isAdmin() && !data.publicAccess() && !player.hasPermission("cdrwaystone.admin")) {
-            player.sendMessage("§cThis Admin Waystone is not public.");
+        if (!player.hasPermission("cdrwaystone.admin") && status(player, data) == State.UNKNOWN) {
+            player.sendMessage("§7You have not discovered this Waystone yet.");
             return false;
         }
         if (status(player, data) == State.ACTIVATED) return true;
@@ -176,7 +175,7 @@ public final class DiscoveryService {
     }
 
     private boolean canDiscover(Player player, WaystoneData data) {
-        if (data.isAdmin() && !data.publicAccess() && !player.hasPermission("cdrwaystone.admin")) return false;
+        if (!plugin.access().canAccess(player, data)) return false;
         Location location = data.location();
         return location != null && location.getWorld() != null && location.getWorld().equals(player.getWorld());
     }
