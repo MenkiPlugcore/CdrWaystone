@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.0 - Waystone Network Travel
+
+- Added a premium paginated Waystone Network GUI with up to 28 destinations per page.
+- Sneak + right-click an activated Waystone with an empty hand to open its Network.
+- The Network can only be opened from an accessible, activated, non-suppressed origin Waystone while the player remains nearby.
+- Only destinations the player can currently access and use are shown.
+- Player Waystone `PRIVATE`, `TRUSTED`, and `PUBLIC` access rules are respected automatically.
+- Admin Waystone public/private policy is respected automatically.
+- Network destinations are sorted with Admin Waystones first, then Player Waystones, alphabetically within each group.
+- Destination cards show type, world, route distance, skin, and live route status.
+- Added structured route states for ready, unavailable world, missing Waystone, access denied, not discovered, not activated, suppressed, cross-world disabled, and missing dimensional power.
+- Unavailable destinations remain visible when already activated/access-eligible, but are clearly marked and cannot start travel.
+- Route access and availability are revalidated when a destination is clicked and again when the normal warp countdown completes.
+- Network Travel reuses the existing countdown, damage cancellation, cross-world rules, power consumption, safe-arrival search, and Portal Sickness systems.
+- Network GUI refreshes dynamically from live registry/discovery/access data and requires no additional database file.
+- Added configurable `network.enabled`, `network.origin-radius`, and `network.destinations-per-page` settings.
+
 ## 0.3.1 - Player Waystone Ownership & Access
 
 - Added first-class Player Waystone access modes: `PRIVATE`, `TRUSTED`, and `PUBLIC`.
