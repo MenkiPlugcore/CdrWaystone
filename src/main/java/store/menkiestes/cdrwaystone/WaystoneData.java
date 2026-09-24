@@ -4,10 +4,14 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 
 public final class WaystoneData {
     public enum Type { PLAYER, ADMIN }
+    public enum AccessMode { PRIVATE, TRUSTED, PUBLIC }
 
     private final UUID id;
     private UUID owner;
@@ -25,11 +29,14 @@ public final class WaystoneData {
     private boolean permanent;
     private boolean alwaysActive;
     private boolean globallyDiscovered;
+    private AccessMode accessMode;
+    private final Set<UUID> trustedPlayers;
 
     public WaystoneData(UUID id, UUID owner, UUID worldId, String worldName,
                         int x, int y, int z, String name, String skin, boolean collisionOwned,
                         Type type, boolean publicAccess, boolean freeTravel,
-                        boolean permanent, boolean alwaysActive, boolean globallyDiscovered) {
+                        boolean permanent, boolean alwaysActive, boolean globallyDiscovered,
+                        AccessMode accessMode, Set<UUID> trustedPlayers) {
         this.id = id;
         this.owner = owner;
         this.worldId = worldId;
@@ -46,6 +53,8 @@ public final class WaystoneData {
         this.permanent = permanent;
         this.alwaysActive = alwaysActive;
         this.globallyDiscovered = globallyDiscovered;
+        this.accessMode = accessMode == null ? AccessMode.PRIVATE : accessMode;
+        this.trustedPlayers = new LinkedHashSet<>(trustedPlayers == null ? Set.of() : trustedPlayers);
     }
 
     public UUID id() { return id; }
@@ -65,6 +74,9 @@ public final class WaystoneData {
     public boolean permanent() { return permanent; }
     public boolean alwaysActive() { return alwaysActive; }
     public boolean globallyDiscovered() { return globallyDiscovered; }
+    public AccessMode accessMode() { return accessMode; }
+    public Set<UUID> trustedPlayers() { return Collections.unmodifiableSet(trustedPlayers); }
+    public boolean isTrusted(UUID playerId) { return playerId != null && trustedPlayers.contains(playerId); }
 
     public void owner(UUID value) { this.owner = value; }
     public void name(String value) { this.name = value; }
@@ -76,6 +88,10 @@ public final class WaystoneData {
     public void permanent(boolean value) { this.permanent = value; }
     public void alwaysActive(boolean value) { this.alwaysActive = value; }
     public void globallyDiscovered(boolean value) { this.globallyDiscovered = value; }
+    public void accessMode(AccessMode value) { this.accessMode = value == null ? AccessMode.PRIVATE : value; }
+    public boolean trust(UUID playerId) { return playerId != null && trustedPlayers.add(playerId); }
+    public boolean untrust(UUID playerId) { return playerId != null && trustedPlayers.remove(playerId); }
+    public void clearTrusted() { trustedPlayers.clear(); }
 
     public World world() {
         World world = Bukkit.getWorld(worldId);
