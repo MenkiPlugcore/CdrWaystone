@@ -19,6 +19,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     private VisualService visuals;
     private TeleportService teleports;
     private MaintenanceService maintenance;
+    private WaystoneGui gui;
     private Map<String, String> skins = new LinkedHashMap<>();
 
     @Override
@@ -34,8 +35,10 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         visuals = new VisualService(this);
         teleports = new TeleportService(this);
         maintenance = new MaintenanceService(this);
+        gui = new WaystoneGui(this);
 
         getServer().getPluginManager().registerEvents(new WaystoneListener(this), this);
+        getServer().getPluginManager().registerEvents(gui, this);
         CdrWaystoneCommand commandHandler = new CdrWaystoneCommand(this);
         PluginCommand command = getCommand("cdrwaystone");
         if (command != null) {
@@ -56,9 +59,6 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         if (maintenance != null) maintenance.stop();
         if (teleports != null) teleports.cancelAll();
         if (registry != null) registry.save();
-        // ItemDisplays are runtime-only. Remove only visuals on plugin unload;
-        // collision Barriers remain managed so a hot reload cannot expose/alter
-        // the structure between disable and enable.
         if (visuals != null) visuals.removeAllVisualEntities();
     }
 
@@ -112,5 +112,6 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     public VisualService visuals() { return visuals; }
     public TeleportService teleports() { return teleports; }
     public MaintenanceService maintenance() { return maintenance; }
+    public WaystoneGui gui() { return gui; }
     public Map<String, String> skins() { return skins; }
 }
