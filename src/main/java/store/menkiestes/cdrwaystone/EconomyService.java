@@ -34,7 +34,12 @@ public final class EconomyService {
     }
 
     public Quote quote(Player player, WaystoneData origin, WaystoneData target) {
-        if (target == null || target.freeTravel()
+        // v0.6.2 rule: all paid travel must originate from a real Waystone node.
+        if (origin == null || target == null) {
+            return new Quote(0.0, 0.0, Provider.NONE, "WAYSTONE ORIGIN REQUIRED", false, false);
+        }
+
+        if (target.freeTravel()
                 || (player != null && player.hasPermission("cdrwaystone.cost.bypass"))
                 || !plugin.getConfig().getBoolean("economy.enabled", true)) {
             return new Quote(0.0, 0.0, Provider.NONE, "FREE", true, true);
@@ -47,9 +52,7 @@ public final class EconomyService {
         }
 
         boolean providerAvailable = provider != Provider.VAULT || ensureVault();
-        double raw = calculateRawCost(player, origin, target);
-        WaystoneData routeNode = origin == null ? target : origin;
-        raw *= plugin.tiers().costMultiplier(routeNode);
+        double raw = calculateRawCost(origin, target);
         if (raw <= 0.0) return new Quote(0.0, 0.0, provider, "FREE", true, providerAvailable);
 
         double charge = normalizeCharge(raw, provider);
@@ -120,26 +123,26 @@ public final class EconomyService {
     public String providerLabel() {
         Provider configured = configuredProvider();
         Provider resolved = resolveProvider(configured);
-        if (configured == Provider.AUTO) return "AUTO → " + resolved.name();
+        if (configured == Provider.AUTO) return "AUTO -> " + resolved.name();
         return resolved.name();
     }
 
-    private double calculateRawCost(Player player, WaystoneData origin, WaystoneData target) {
-        double base = Math.max(0.0, plugin.getConfig().getDouble("economy.pricing.base-cost", 0.0));
+    private double calculateRawCost(WaystoneData origin, WaystoneData target) {
+        double base = Math.max(0.0, plugin.getConfig().getDouble("economy.pricing.base-cost", 500.0));
         double cost = base;
 
-        Location from = origin == null ? (player == null ? null : player.getLocation()) : origin.location();
+        Location from = origin.location();
         Location to = target.location();
         boolean crossWorld = from == null || to == null || from.getWorld() == null || to.getWorld() == null
                 || !from.getWorld().getUID().equals(to.getWorld().getUID());
 
         if (crossWorld) {
-            cost += Math.max(0.0, plugin.getConfig().getDouble("economy.pricing.cross-world-flat-cost", 1000.0));
+            cost += Math.max(0.0, plugin.getConfig().getDouble("economy.pricing.cross-world-flat-cost", 5000.0));
         } else if (plugin.getConfig().getBoolean("economy.pricing.distance.enabled", true)) {
             double distance = from.distance(to);
-            double freeDistance = Math.max(0.0, plugin.getConfig().getDouble("economy.pricing.distance.free-distance", 500.0));
+            double freeDistance = Math.max(0.0, plugin.getConfig().getDouble("economy.pricing.distance.free-distance", 0.0));
             double billable = Math.max(0.0, distance - freeDistance);
-            double per1000 = Math.max(0.0, plugin.getConfig().getDouble("economy.pricing.distance.cost-per-1000-blocks", 250.0));
+            double per1000 = Math.max(0.0, plugin.getConfig().getDouble("economy.pricing.distance.cost-per-1000-blocks", 500.0));
             cost += (billable / 1000.0) * per1000;
         }
 
@@ -174,9 +177,9 @@ public final class EconomyService {
 
     private Provider configuredProvider() {
         try {
-            return Provider.valueOf(plugin.getConfig().getString("economy.provider", "AUTO").toUpperCase(Locale.ROOT));
+            return Provider.valueOf(plugin.getConfig().getString("economy.provider", "VAULT").toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ex) {
-            return Provider.AUTO;
+            return Provider.VAULT;
         }
     }
 
