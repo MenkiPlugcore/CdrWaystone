@@ -39,7 +39,7 @@ public final class WaystoneGui implements Listener {
 
         inv.setItem(13, item(data.isAdmin() ? Material.NETHER_STAR : Material.LODESTONE,
                 "✦ " + data.name(), data.isAdmin() ? NamedTextColor.GOLD : NamedTextColor.LIGHT_PURPLE,
-                "Type: " + data.type(), "Skin: " + pretty(data.skin()), "Waystone ID: " + data.id().toString().substring(0, 8)));
+                "Type: " + data.type(), "Core: " + data.coreState(), "Skin: " + pretty(data.skin()), "Waystone ID: " + data.id().toString().substring(0, 8)));
 
         if (data.isAdmin()) {
             inv.setItem(20, item(Material.COMMAND_BLOCK, "Server Authority", NamedTextColor.GOLD,
@@ -51,14 +51,25 @@ public final class WaystoneGui implements Listener {
         }
 
         DiscoveryService.State discoveryState = plugin.discovery().status(player, data);
-        inv.setItem(21, discoveryItem(discoveryState));
+        if (!data.coreActive() && !(data.isAdmin() && plugin.getConfig().getBoolean("core.admin-bypass", true))) {
+            inv.setItem(21, item(plugin.cores().coreMaterial(), "Dormant Core", NamedTextColor.LIGHT_PURPLE,
+                    "This Waystone has not been awakened", "Install a Waystone Core to unlock attunement", "Owner/Admin: right-click with a Waystone Core"));
+        } else {
+            inv.setItem(21, discoveryItem(discoveryState));
+        }
 
+        boolean dormant = !data.coreActive() && !(data.isAdmin() && plugin.getConfig().getBoolean("core.admin-bypass", true));
         boolean suppressed = plugin.teleports().isSuppressed(data);
-        inv.setItem(22, item(suppressed ? Material.REDSTONE_TORCH : Material.LIME_DYE,
-                suppressed ? "Suppressed" : (data.alwaysActive() ? "Always Active" : "Online"),
-                suppressed ? NamedTextColor.RED : NamedTextColor.GREEN,
-                data.alwaysActive() ? "Server override keeps this Waystone online" : (suppressed ? "Travel to this Waystone is disabled" : "Waystone is operational"),
-                data.alwaysActive() ? "Suppression and power requirements bypassed" : (suppressed ? "Remove the suppressor block below it" : "Activation is tracked per player")));
+        if (dormant) {
+            inv.setItem(22, item(Material.CRYING_OBSIDIAN, "Dormant", NamedTextColor.LIGHT_PURPLE,
+                    "Travel network is offline", "A Waystone Core is required", "Discovery can occur, but travel stays locked"));
+        } else {
+            inv.setItem(22, item(suppressed ? Material.REDSTONE_TORCH : Material.LIME_DYE,
+                    suppressed ? "Suppressed" : (data.alwaysActive() ? "Always Active" : "Online"),
+                    suppressed ? NamedTextColor.RED : NamedTextColor.GREEN,
+                    data.alwaysActive() ? "Server override keeps this Waystone online" : (suppressed ? "Travel to this Waystone is disabled" : "Waystone is operational"),
+                    data.alwaysActive() ? "Suppression and power requirements bypassed" : (suppressed ? "Remove the suppressor block below it" : "Activation is tracked per player")));
+        }
 
         inv.setItem(24, powerItem(data));
         inv.setItem(29, item(Material.AMETHYST_SHARD, "Skin Gallery", NamedTextColor.LIGHT_PURPLE,
@@ -66,11 +77,12 @@ public final class WaystoneGui implements Listener {
         inv.setItem(31, item(Material.NAME_TAG, "Rename Waystone", NamedTextColor.AQUA,
                 "Rename a Name Tag in an Anvil", "then right-click this Waystone", plugin.access().canManage(player, data) ? "You may rename this Waystone" : "Owner/Admin only"));
         inv.setItem(33, item(Material.COMPASS, "Waystone Key", NamedTextColor.YELLOW,
-                discoveryState == DiscoveryService.State.ACTIVATED ? "This Waystone is ready for Key binding" : "Activate this Waystone before binding a Key",
+                dormant ? "Waystone Core required before Key binding" : (discoveryState == DiscoveryService.State.ACTIVATED ? "This Waystone is ready for Key binding" : "Activate this Waystone before binding a Key"),
                 "Sneak + right-click to relink", "Use the bound key elsewhere to warp"));
         inv.setItem(38, item(Material.MAP, "Coordinates", NamedTextColor.AQUA,
                 data.worldName(), "X " + data.x() + "  Y " + data.y() + "  Z " + data.z()));
         inv.setItem(40, item(Material.CLOCK, "Travel Rules", NamedTextColor.YELLOW,
+                "Core: " + data.coreState(),
                 "Countdown: " + plugin.getConfig().getInt("warp.delay-seconds", 5) + " seconds",
                 "Damage cancel: " + enabled(plugin.getConfig().getBoolean("warp.damage-cancels", true)),
                 "Cross-world: " + enabled(plugin.getConfig().getBoolean("warp.allow-cross-world", true)),
@@ -135,7 +147,8 @@ public final class WaystoneGui implements Listener {
         Inventory inv = Bukkit.createInventory(holder, 45, Component.text("✦ Admin Waystone Control", NamedTextColor.GOLD, TextDecoration.BOLD));
         holder.inventory = inv;
         paintFrame(inv, true);
-        inv.setItem(4, item(Material.NETHER_STAR, data.name(), NamedTextColor.GOLD, "Official server infrastructure", "Changes save instantly"));
+        inv.setItem(4, item(Material.NETHER_STAR, data.name(), NamedTextColor.GOLD,
+                "Official server infrastructure", "Core: " + data.coreState(), "Changes save instantly"));
         inv.setItem(20, item(data.publicAccess() ? Material.LIME_DYE : Material.RED_DYE, "Public Access", data.publicAccess() ? NamedTextColor.GREEN : NamedTextColor.RED,
                 "Current: " + yesNo(data.publicAccess()), "Allow normal players to discover, bind and travel", "Click to toggle"));
         inv.setItem(22, item(data.freeTravel() ? Material.EMERALD : Material.COAL, "Free Travel", data.freeTravel() ? NamedTextColor.GREEN : NamedTextColor.GRAY,
@@ -194,6 +207,11 @@ public final class WaystoneGui implements Listener {
         if (holder.screen == Screen.MAIN) {
             switch (event.getRawSlot()) {
                 case 21 -> {
+                    if (!data.coreActive() && !(data.isAdmin() && plugin.getConfig().getBoolean("core.admin-bypass", true))) {
+                        player.sendMessage("§5This Waystone is Dormant. §7Right-click it with a §dWaystone Core§7 to awaken it.");
+                        click(player);
+                        return;
+                    }
                     DiscoveryService.State state = plugin.discovery().status(player, data);
                     if (state == DiscoveryService.State.DISCOVERED) {
                         plugin.discovery().activate(player, data);
@@ -212,7 +230,7 @@ public final class WaystoneGui implements Listener {
                 }
                 case 33 -> {
                     player.closeInventory();
-                    player.sendMessage("§eWaystone Key: §factivate a Waystone first, right-click with a Key to bind, sneak + right-click to relink, then use it elsewhere to warp.");
+                    player.sendMessage("§eWaystone Key: §fawaken the Waystone Core, activate the Waystone, right-click with a Key to bind, sneak + right-click to relink, then use it elsewhere to warp.");
                 }
                 case 42 -> {
                     if (data.isAdmin() && player.hasPermission("cdrwaystone.admin")) openAdmin(player, data);
@@ -322,6 +340,9 @@ public final class WaystoneGui implements Listener {
     }
 
     private ItemStack powerItem(WaystoneData data) {
+        if (!data.coreActive() && !(data.isAdmin() && plugin.getConfig().getBoolean("core.admin-bypass", true)))
+            return item(plugin.cores().coreMaterial(), "Waystone Core", NamedTextColor.LIGHT_PURPLE,
+                    "Core state: DORMANT", "Install a Waystone Core before travel power matters");
         if (data.alwaysActive()) return item(Material.BEACON, "Dimensional Power", NamedTextColor.AQUA, "Always Active override", "No Respawn Anchor charge required");
         Block below = data.location() == null ? null : data.location().clone().add(0,-1,0).getBlock();
         if (below != null && below.getType() == Material.RESPAWN_ANCHOR && below.getBlockData() instanceof RespawnAnchor anchor)
