@@ -51,11 +51,17 @@ public final class TravelGuardService {
     }
 
     public void markTravelSuccess(Player player) {
+        markTravelSuccess(player, null);
+    }
+
+    public void markTravelSuccess(Player player, WaystoneData routeNode) {
         if (player == null || !plugin.getConfig().getBoolean("anti-abuse.cooldown.enabled", true)
                 || player.hasPermission("cdrwaystone.cooldown.bypass")) return;
-        int seconds = Math.max(0, plugin.getConfig().getInt("anti-abuse.cooldown.seconds", 30));
-        if (seconds <= 0) return;
-        cooldownUntil.put(player.getUniqueId(), System.currentTimeMillis() + seconds * 1000L);
+        double baseSeconds = Math.max(0, plugin.getConfig().getInt("anti-abuse.cooldown.seconds", 30));
+        double multiplier = routeNode == null ? 1.0 : plugin.tiers().cooldownMultiplier(routeNode);
+        long millis = (long) Math.ceil(baseSeconds * Math.max(0.0, multiplier) * 1000.0);
+        if (millis <= 0) return;
+        cooldownUntil.put(player.getUniqueId(), System.currentTimeMillis() + millis);
     }
 
     public void tagCombat(Player player) {
