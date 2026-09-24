@@ -18,8 +18,8 @@ import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 public final class WaystoneListener implements Listener {
@@ -46,6 +46,9 @@ public final class WaystoneListener implements Listener {
         String skin = plugin.getConfig().getString("visuals.default-skin", "andesite");
         if (!plugin.skins().containsKey(skin)) skin = "andesite";
         String name = plugin.getConfig().getString("waystones.default-name", "Waystone");
+        WaystoneData.Category category = parseCategory(
+                plugin.getConfig().getString("staff-placement.category", "CITY"),
+                WaystoneData.Category.CITY);
 
         WaystoneData data = plugin.registry().create(
                 null,
@@ -53,22 +56,20 @@ public final class WaystoneListener implements Listener {
                 name,
                 skin,
                 WaystoneData.Type.ADMIN,
-                plugin.getConfig().getBoolean("admin-waystones.default-public", true),
-                plugin.getConfig().getBoolean("admin-waystones.default-free", false),
-                plugin.getConfig().getBoolean("admin-waystones.default-permanent", false),
-                plugin.getConfig().getBoolean("admin-waystones.default-always-active", true),
-                plugin.getConfig().getBoolean("admin-waystones.default-globally-discovered", true),
+                plugin.getConfig().getBoolean("staff-placement.public", true),
+                plugin.getConfig().getBoolean("staff-placement.free", false),
+                plugin.getConfig().getBoolean("staff-placement.permanent", false),
+                plugin.getConfig().getBoolean("staff-placement.always-active", true),
+                plugin.getConfig().getBoolean("staff-placement.globally-discovered", true),
                 WaystoneData.AccessMode.PRIVATE,
                 Set.of(),
-                WaystoneData.Category.CITY,
+                category,
                 WaystoneData.CoreState.ACTIVE
         );
         plugin.discovery().setState(player.getUniqueId(), data.id(), DiscoveryService.State.ACTIVATED, true);
 
-        // Do conversion after vanilla placement has fully committed.
         plugin.getServer().getScheduler().runTask(plugin, () -> {
             if (!plugin.visuals().materialize(data)) {
-                // Preserve the vanilla Lodestone and avoid a ghost registry entry when ItemsAdder is unavailable.
                 plugin.registry().remove(data);
                 plugin.discovery().forgetWaystone(data.id());
                 plugin.feedback().action(player, "§cWaystone model unavailable §7• Lodestone kept vanilla");
@@ -84,7 +85,6 @@ public final class WaystoneListener implements Listener {
         WaystoneData data = waystoneFromClickedBlock(block);
         if (data == null) return;
 
-        // Invisible anchors are infrastructure, never vanilla break targets.
         if (block.getType() == Material.BARRIER) {
             event.setCancelled(true);
             if (data.isAdmin() && !event.getPlayer().hasPermission("cdrwaystone.admin")) {
@@ -134,7 +134,7 @@ public final class WaystoneListener implements Listener {
         }
 
         WaystoneData clickedWaystone = waystoneFromClickedBlock(event.getClickedBlock());
-        if (clickedWaystone == null) return; // Member vanilla Lodestones intentionally pass through untouched.
+        if (clickedWaystone == null) return;
 
         Player player = event.getPlayer();
         ItemStack hand = player.getInventory().getItemInMainHand();
@@ -306,6 +306,15 @@ public final class WaystoneListener implements Listener {
             WaystoneData data = dataFromManagedBlock(block);
             return data != null && data.isAdmin() && data.permanent();
         });
+    }
+
+    private WaystoneData.Category parseCategory(String raw, WaystoneData.Category fallback) {
+        if (raw == null) return fallback;
+        try {
+            return WaystoneData.Category.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ignored) {
+            return fallback;
+        }
     }
 
     private boolean coreOperational(WaystoneData data) {
