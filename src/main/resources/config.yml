@@ -1,4 +1,4 @@
-# CdrWaystone v0.1.1
+# CdrWaystone v0.2.0
 # Paper 1.21.11 + Java 21
 
 waystones:
@@ -27,15 +27,15 @@ collision:
   enabled: true
 
 protection:
-  # Prevent explosions from desynchronizing registered Waystones.
   explosions: true
-  # Prevent pistons from moving registered Waystones/collision blocks.
   pistons: true
 
 stability:
-  # Self-healing pass for /setblock, external plugins, crash leftovers, etc.
-  # Minimum accepted value is 30 seconds.
   health-check-seconds: 300
+
+gui:
+  # Right-click a CdrWaystone without a Waystone Key/Name Tag to open the UI.
+  enabled: true
 
 portal-sickness:
   enabled: true
@@ -47,7 +47,6 @@ portal-sickness:
 visuals:
   enabled: true
   default-skin: andesite
-  # Applied to the ItemDisplay spawn point.
   y-offset: 0.0
   rotation-degrees: 0.0
   view-range: 1.5
