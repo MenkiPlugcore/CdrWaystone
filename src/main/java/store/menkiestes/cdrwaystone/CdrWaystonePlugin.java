@@ -17,6 +17,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     private WaystoneRegistry registry;
     private KeyService keys;
     private VisualService visuals;
+    private EconomyService economy;
     private TeleportService teleports;
     private MaintenanceService maintenance;
     private DiscoveryService discovery;
@@ -37,6 +38,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         keys = new KeyService(this);
         visuals = new VisualService(this);
         access = new AccessService(this);
+        economy = new EconomyService(this);
         teleports = new TeleportService(this);
         maintenance = new MaintenanceService(this);
         discovery = new DiscoveryService(this);
@@ -60,7 +62,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
             maintenance.start();
             discovery.start();
         }, 80L);
-        getLogger().info("CdrWaystone v" + getPluginMeta().getVersion() + " enabled with " + skins.size() + " skin(s).");
+        getLogger().info("CdrWaystone v" + getPluginMeta().getVersion() + " enabled with " + skins.size() + " skin(s). Economy: " + economy.providerLabel());
     }
 
     @Override
@@ -79,6 +81,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         reloadConfig();
         mergeConfigDefaults();
         loadSkins();
+        if (economy != null) economy.reload();
         registerKeyRecipe();
         visuals.refreshAllLoaded();
         if (maintenance != null) maintenance.start();
@@ -124,6 +127,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     public WaystoneRegistry registry() { return registry; }
     public KeyService keys() { return keys; }
     public VisualService visuals() { return visuals; }
+    public EconomyService economy() { return economy; }
     public TeleportService teleports() { return teleports; }
     public MaintenanceService maintenance() { return maintenance; }
     public DiscoveryService discovery() { return discovery; }
