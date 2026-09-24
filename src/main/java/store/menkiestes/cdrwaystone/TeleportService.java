@@ -21,6 +21,7 @@ public final class TeleportService {
         READY,
         WORLD_UNAVAILABLE,
         MISSING,
+        DORMANT,
         NO_ACCESS,
         NOT_DISCOVERED,
         NOT_ACTIVATED,
@@ -165,6 +166,7 @@ public final class TeleportService {
         Location targetLoc = target.location();
         if (targetLoc == null || targetLoc.getWorld() == null) return TravelStatus.WORLD_UNAVAILABLE;
         if (targetLoc.getBlock().getType() != Material.LODESTONE) return TravelStatus.MISSING;
+        if (!target.coreActive() && !(target.isAdmin() && plugin.getConfig().getBoolean("core.admin-bypass", true))) return TravelStatus.DORMANT;
 
         if (!plugin.access().canAccess(player, target)) return TravelStatus.NO_ACCESS;
 
@@ -186,6 +188,7 @@ public final class TeleportService {
             case READY -> "Ready";
             case WORLD_UNAVAILABLE -> "World unavailable";
             case MISSING -> "Waystone missing";
+            case DORMANT -> "Dormant • Core required";
             case NO_ACCESS -> "Access denied";
             case NOT_DISCOVERED -> "Not discovered";
             case NOT_ACTIVATED -> "Not activated";
@@ -206,6 +209,7 @@ public final class TeleportService {
         switch (status) {
             case WORLD_UNAVAILABLE -> player.sendMessage("§cThat Waystone world is unavailable.");
             case MISSING -> player.sendMessage("§cThat Waystone no longer exists.");
+            case DORMANT -> player.sendMessage("§5That Waystone is Dormant. §7Its owner must install a §dWaystone Core§7 first.");
             case NO_ACCESS -> {
                 if (target != null && target.isAdmin()) player.sendMessage("§cThat Admin Waystone is not public.");
                 else player.sendMessage("§cYou no longer have access to that Player Waystone.");
