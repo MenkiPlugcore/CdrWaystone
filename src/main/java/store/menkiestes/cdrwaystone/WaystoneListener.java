@@ -32,9 +32,10 @@ public final class WaystoneListener implements Listener {
         String skin = plugin.getConfig().getString("visuals.default-skin", "andesite");
         String name = plugin.getConfig().getString("waystones.default-name", "Waystone");
         WaystoneData data = plugin.registry().create(event.getPlayer().getUniqueId(), event.getBlockPlaced().getLocation(), name, skin);
+        plugin.discovery().setState(event.getPlayer().getUniqueId(), data.id(), DiscoveryService.State.ACTIVATED, true);
         plugin.visuals().ensureCollision(data);
         plugin.getServer().getScheduler().runTask(plugin, () -> plugin.visuals().spawn(data));
-        event.getPlayer().sendMessage("§aCdrWaystone created. Skin: §f" + skin);
+        event.getPlayer().sendMessage("§aCdrWaystone created and activated. Skin: §f" + skin);
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
@@ -60,6 +61,7 @@ public final class WaystoneListener implements Listener {
         }
         plugin.visuals().remove(data);
         plugin.registry().remove(data);
+        plugin.discovery().forgetWaystone(data.id());
         event.getPlayer().sendMessage("§eCdrWaystone removed.");
     }
 
@@ -71,6 +73,8 @@ public final class WaystoneListener implements Listener {
         WaystoneData clickedWaystone = event.getClickedBlock() == null ? null : waystoneFromClickedBlock(event.getClickedBlock());
 
         if (clickedWaystone != null) {
+            plugin.discovery().discover(player, clickedWaystone, true);
+
             if (hand.getType() == Material.NAME_TAG && hand.hasItemMeta() && hand.getItemMeta().hasDisplayName()) {
                 if (!canManage(player, clickedWaystone)) {
                     player.sendMessage("§cYou cannot rename this Waystone."); event.setCancelled(true); return;
@@ -87,6 +91,10 @@ public final class WaystoneListener implements Listener {
                 if (!player.hasPermission("cdrwaystone.use")) return;
                 if (clickedWaystone.isAdmin() && !clickedWaystone.publicAccess() && !player.hasPermission("cdrwaystone.admin")) {
                     player.sendMessage("§cThis Admin Waystone is private to server administration."); event.setCancelled(true); return;
+                }
+                if (!plugin.discovery().canUse(player, clickedWaystone)) {
+                    player.sendMessage("§dThis Waystone must be activated first. §7Right-click it normally and use the Activate button.");
+                    event.setCancelled(true); return;
                 }
                 if (plugin.teleports().isSuppressed(clickedWaystone)) {
                     player.sendMessage("§cThis Waystone is suppressed."); event.setCancelled(true); return;
@@ -138,7 +146,13 @@ public final class WaystoneListener implements Listener {
             plugin.visuals().ensureCollision(data);
             plugin.getServer().getScheduler().runTask(plugin, () -> plugin.visuals().spawn(data));
         }
-        if (!stale.isEmpty()) { for (WaystoneData data : stale) plugin.registry().remove(data, false); plugin.registry().save(); }
+        if (!stale.isEmpty()) {
+            for (WaystoneData data : stale) {
+                plugin.registry().remove(data, false);
+                plugin.discovery().forgetWaystone(data.id());
+            }
+            plugin.registry().save();
+        }
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH) public void onEntityExplode(EntityExplodeEvent event) { handleExplosion(event.blockList()); }
@@ -165,7 +179,7 @@ public final class WaystoneListener implements Listener {
             for (WaystoneData data : affected) {
                 Location location = data.location();
                 if (location != null && location.getBlock().getType() != Material.LODESTONE) {
-                    plugin.visuals().remove(data); plugin.registry().remove(data, false); changed = true;
+                    plugin.visuals().remove(data); plugin.registry().remove(data, false); plugin.discovery().forgetWaystone(data.id()); changed = true;
                 }
             }
             if (changed) plugin.registry().save();
