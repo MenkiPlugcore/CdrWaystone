@@ -10,6 +10,10 @@ commands:
     description: Main CdrWaystone command
     aliases: [cws, cdrws]
     usage: /cws <info|category|access|trust|untrust|trusted|transfer|limit|skin|skins|admin|refresh|reload>
+  cdrwaystonecore:
+    description: Administrative Waystone Core command
+    aliases: [cwscore, wscore]
+    usage: /cwscore give <player> [amount]
 permissions:
   cdrwaystone.use:
     description: Allows using CdrWaystones and Waystone Keys
@@ -31,6 +35,9 @@ permissions:
     default: op
   cdrwaystone.knockout.bypass:
     description: Bypasses CdrKnockout travel restrictions
+    default: op
+  cdrwaystone.core.consume.bypass:
+    description: Prevents Waystone Cores from being consumed when installed
     default: op
   cdrwaystone.admin:
     description: Administrative access to CdrWaystone and Admin Waystones
