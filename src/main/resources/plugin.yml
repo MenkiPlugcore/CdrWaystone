@@ -9,7 +9,7 @@ commands:
   cdrwaystone:
     description: Main CdrWaystone command
     aliases: [cws, cdrws]
-    usage: /cws <info|access|trust|untrust|trusted|transfer|limit|skin|skins|admin|refresh|reload>
+    usage: /cws <info|category|access|trust|untrust|trusted|transfer|limit|skin|skins|admin|refresh|reload>
 permissions:
   cdrwaystone.use:
     description: Allows using CdrWaystones and Waystone Keys
