@@ -48,12 +48,21 @@ public final class TeleportService {
                         player.sendMessage("§cNo safe destination found near that Waystone.");
                         cleanup(player); cancel(); return;
                     }
-                    consumePowerIfNeeded(player, target);
-                    player.teleport(destination);
-                    player.playSound(destination, Sound.BLOCK_PORTAL_TRAVEL, 0.6f, 1.2f);
-                    applyPortalSickness(player);
+
+                    boolean crossWorld = !player.getWorld().getUID().equals(target.worldId());
+                    // Commit the warp before calling Bukkit teleport. This prevents the
+                    // teleport-generated move event and portal sickness damage from
+                    // cancelling a warp that has already completed.
                     cleanup(player);
                     cancel();
+
+                    if (!player.teleport(destination)) {
+                        player.sendMessage("§cTeleport failed. No Waystone power was consumed.");
+                        return;
+                    }
+                    consumePowerIfNeeded(target, crossWorld);
+                    player.playSound(destination, Sound.BLOCK_PORTAL_TRAVEL, 0.6f, 1.2f);
+                    applyPortalSickness(player);
                     return;
                 }
                 player.sendActionBar(Component.text("Warping in " + remaining + "s..."));
@@ -69,8 +78,14 @@ public final class TeleportService {
         startLocations.remove(player.getUniqueId());
         if (task != null) {
             task.cancel();
-            player.sendActionBar(Component.text("Warp cancelled: " + reason));
+            if (player.isOnline()) player.sendActionBar(Component.text("Warp cancelled: " + reason));
         }
+    }
+
+    public void cancelAll() {
+        for (BukkitTask task : active.values()) task.cancel();
+        active.clear();
+        startLocations.clear();
     }
 
     public Location startLocation(Player player) { return startLocations.get(player.getUniqueId()); }
@@ -122,8 +137,7 @@ public final class TeleportService {
         return anchor.getCharges() >= cost;
     }
 
-    private void consumePowerIfNeeded(Player player, WaystoneData target) {
-        boolean crossWorld = !player.getWorld().getUID().equals(target.worldId());
+    private void consumePowerIfNeeded(WaystoneData target, boolean crossWorld) {
         if (!requiresPower(crossWorld)) return;
         Location loc = target.location();
         if (loc == null) return;
