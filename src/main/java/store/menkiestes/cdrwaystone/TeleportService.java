@@ -26,7 +26,9 @@ public final class TeleportService {
         NOT_ACTIVATED,
         SUPPRESSED,
         CROSS_WORLD_DISABLED,
-        NO_POWER
+        NO_POWER,
+        ECONOMY_UNAVAILABLE,
+        INSUFFICIENT_FUNDS
     }
 
     private final CdrWaystonePlugin plugin;
@@ -37,28 +39,74 @@ public final class TeleportService {
     public boolean isWarping(Player player) { return active.containsKey(player.getUniqueId()); }
 
     public void start(Player player, WaystoneData target) {
+        start(player, target, null);
+    }
+
+    public void start(Player player, WaystoneData target, WaystoneData origin) {
         if (isWarping(player)) { player.sendMessage("§cYou are already warping."); return; }
-        if (!validateTarget(player, target)) return;
+
+        TravelStatus initialStatus = travelStatus(player, target, origin);
+        if (!validateStatus(player, target, initialStatus)) return;
+
+        EconomyService.Quote quote = plugin.economy().quote(player, origin, target);
+        if (!quote.providerAvailable()) {
+            player.sendMessage("§cTravel economy provider is unavailable.");
+            return;
+        }
+        if (!plugin.economy().canAfford(player, quote)) {
+            player.sendMessage("§cYou need §f" + quote.formatted() + "§c to use this Waystone route.");
+            return;
+        }
+
         int delay = Math.max(0, plugin.getConfig().getInt("warp.delay-seconds", 5));
         startLocations.put(player.getUniqueId(), player.getLocation().clone());
+        if (!quote.free()) player.sendMessage("§7Travel cost locked: §f" + quote.formatted());
 
         BukkitTask task = new BukkitRunnable() {
             int remaining = delay;
             @Override public void run() {
                 if (!player.isOnline()) { cleanup(player); cancel(); return; }
                 if (remaining <= 0) {
-                    if (!validateTarget(player, target)) { cleanup(player); cancel(); return; }
+                    TravelStatus routeStatus = travelStatusCore(player, target);
+                    if (!validateStatus(player, target, routeStatus)) { cleanup(player); cancel(); return; }
+                    if (!quote.providerAvailable()) {
+                        player.sendMessage("§cTravel economy provider became unavailable."); cleanup(player); cancel(); return;
+                    }
+                    if (!plugin.economy().canAfford(player, quote)) {
+                        player.sendMessage("§cTravel cancelled. You no longer have §f" + quote.formatted() + "§c.");
+                        cleanup(player); cancel(); return;
+                    }
+
                     Location destination = safeDestination(target);
-                    if (destination == null) { player.sendMessage("§cNo safe destination found near that Waystone."); cleanup(player); cancel(); return; }
+                    if (destination == null) {
+                        player.sendMessage("§cNo safe destination found near that Waystone."); cleanup(player); cancel(); return;
+                    }
+
                     boolean crossWorld = !player.getWorld().getUID().equals(target.worldId());
-                    cleanup(player); cancel();
-                    if (!player.teleport(destination)) { player.sendMessage("§cTeleport failed. No Waystone power was consumed."); return; }
+                    EconomyService.Payment payment = plugin.economy().charge(player, quote);
+                    if (payment == null) {
+                        player.sendMessage("§cTravel payment failed. No teleport was performed.");
+                        cleanup(player); cancel(); return;
+                    }
+
+                    cleanup(player);
+                    cancel();
+                    if (!player.teleport(destination)) {
+                        plugin.economy().refund(player, payment);
+                        player.sendMessage("§cTeleport failed. Travel payment was refunded and no Waystone power was consumed.");
+                        return;
+                    }
+
                     consumePowerIfNeeded(target, crossWorld);
+                    if (payment.charged()) player.sendMessage("§aTravel paid: §f" + quote.formatted());
                     player.playSound(destination, Sound.BLOCK_PORTAL_TRAVEL, 0.6f, 1.2f);
                     applyPortalSickness(player);
                     return;
                 }
-                player.sendActionBar(Component.text("Warping in " + remaining + "s..."));
+
+                String action = "Warping in " + remaining + "s";
+                if (!quote.free()) action += " • " + quote.formatted();
+                player.sendActionBar(Component.text(action));
                 player.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_RESONATE, 0.4f, 1.2f);
                 remaining--;
             }
@@ -77,6 +125,20 @@ public final class TeleportService {
     private void cleanup(Player player) { active.remove(player.getUniqueId()); startLocations.remove(player.getUniqueId()); }
 
     public TravelStatus travelStatus(Player player, WaystoneData target) {
+        return travelStatus(player, target, null);
+    }
+
+    public TravelStatus travelStatus(Player player, WaystoneData target, WaystoneData origin) {
+        TravelStatus core = travelStatusCore(player, target);
+        if (core != TravelStatus.READY) return core;
+
+        EconomyService.Quote quote = plugin.economy().quote(player, origin, target);
+        if (!quote.providerAvailable()) return TravelStatus.ECONOMY_UNAVAILABLE;
+        if (!plugin.economy().canAfford(player, quote)) return TravelStatus.INSUFFICIENT_FUNDS;
+        return TravelStatus.READY;
+    }
+
+    private TravelStatus travelStatusCore(Player player, WaystoneData target) {
         if (player == null || target == null) return TravelStatus.MISSING;
         Location targetLoc = target.location();
         if (targetLoc == null || targetLoc.getWorld() == null) return TravelStatus.WORLD_UNAVAILABLE;
@@ -108,11 +170,12 @@ public final class TeleportService {
             case SUPPRESSED -> "Suppressed";
             case CROSS_WORLD_DISABLED -> "Cross-world disabled";
             case NO_POWER -> "No dimensional power";
+            case ECONOMY_UNAVAILABLE -> "Economy unavailable";
+            case INSUFFICIENT_FUNDS -> "Insufficient funds";
         };
     }
 
-    private boolean validateTarget(Player player, WaystoneData target) {
-        TravelStatus status = travelStatus(player, target);
+    private boolean validateStatus(Player player, WaystoneData target, TravelStatus status) {
         if (status == TravelStatus.READY) return true;
 
         switch (status) {
@@ -127,6 +190,8 @@ public final class TeleportService {
             case SUPPRESSED -> player.sendMessage("§cThat Waystone is suppressed.");
             case CROSS_WORLD_DISABLED -> player.sendMessage("§cCross-world Waystone travel is disabled.");
             case NO_POWER -> player.sendMessage("§cThat Waystone needs a charged Respawn Anchor below it.");
+            case ECONOMY_UNAVAILABLE -> player.sendMessage("§cTravel economy provider is unavailable.");
+            case INSUFFICIENT_FUNDS -> player.sendMessage("§cYou cannot afford this Waystone route.");
             default -> player.sendMessage("§cThat Waystone cannot be used right now.");
         }
         return false;
