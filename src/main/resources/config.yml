@@ -1,4 +1,4 @@
-# CdrWaystone v0.4.1
+# CdrWaystone v0.5.0
 # Paper 1.21.11 + Java 21
 
 waystones:
@@ -23,23 +23,61 @@ admin-waystones:
   default-free: true
   default-permanent: true
   default-always-active: true
-  # Makes new Admin Waystones appear as DISCOVERED to every player.
-  # Players still activate them individually before travel.
   default-globally-discovered: true
 
 discovery:
   enabled: true
-  # First-time discovery radius around a Waystone, in blocks.
   radius: 8.0
-  # 20 ticks = 1 second. Minimum runtime value is 20 ticks.
   scan-interval-ticks: 20
 
 network:
   enabled: true
-  # Player must remain this close to the origin Waystone while using the Network GUI.
   origin-radius: 6.5
-  # Maximum supported value is 28 because the premium GUI reserves navigation slots.
   destinations-per-page: 28
+
+# Travel Cost & Economy Engine
+# Providers: AUTO, VAULT, XP_LEVELS, ITEM, NONE
+# AUTO uses Vault when an economy provider exists, otherwise XP_LEVELS.
+economy:
+  enabled: true
+  provider: AUTO
+
+  pricing:
+    base-cost: 0.0
+    # Added for cross-world travel instead of normal distance pricing.
+    cross-world-flat-cost: 1000.0
+    minimum-cost: 0.0
+    maximum-cost: 1000000.0
+    # CEIL, FLOOR, ROUND, NONE
+    rounding: CEIL
+
+    distance:
+      enabled: true
+      free-distance: 500.0
+      cost-per-1000-blocks: 250.0
+
+    # Applied to the destination category after base/distance/cross-world cost.
+    category-multipliers:
+      CAPITAL: 1.0
+      CITY: 1.0
+      VILLAGE: 1.0
+      DUNGEON: 1.0
+      KINGDOM: 1.0
+      PLAYER: 1.0
+      EVENT: 1.0
+      OTHER: 1.0
+
+  # Used when provider is XP_LEVELS or AUTO falls back to XP_LEVELS.
+  # Example: raw cost 500 with value-per-level 250 = 2 XP levels.
+  xp:
+    value-per-level: 250.0
+
+  # Used when provider is ITEM.
+  # Example: raw cost 500 with value 250 = 2 Emeralds.
+  item:
+    material: EMERALD
+    display-name: Emerald
+    value: 250.0
 
 warp:
   delay-seconds: 5
