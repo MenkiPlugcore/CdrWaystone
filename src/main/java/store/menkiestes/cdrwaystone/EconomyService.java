@@ -103,12 +103,9 @@ public final class EconomyService {
             switch (payment.provider()) {
                 case VAULT -> vaultDeposit(player, payment.amount());
                 case XP_LEVELS -> player.giveExpLevels((int) Math.ceil(payment.amount()));
-                case ITEM -> {
-                    Material material = payment.material() == null ? itemMaterial() : payment.material();
-                    int amount = (int) Math.ceil(payment.amount());
-                    var leftovers = player.getInventory().addItem(new ItemStack(material, amount));
-                    leftovers.values().forEach(stack -> player.getWorld().dropItemNaturally(player.getLocation(), stack));
-                }
+                case ITEM -> refundItems(player,
+                        payment.material() == null ? itemMaterial() : payment.material(),
+                        (int) Math.ceil(payment.amount()));
                 default -> { }
             }
         } catch (Exception ex) {
@@ -160,9 +157,12 @@ public final class EconomyService {
     }
 
     private double normalizeCharge(double raw, Provider provider) {
-        if (provider == Provider.XP_LEVELS) return Math.ceil(raw);
+        if (provider == Provider.XP_LEVELS) {
+            double levelValue = Math.max(0.0001, plugin.getConfig().getDouble("economy.xp.value-per-level", 250.0));
+            return Math.ceil(raw / levelValue);
+        }
         if (provider == Provider.ITEM) {
-            double itemValue = Math.max(0.0001, plugin.getConfig().getDouble("economy.item.value", 1.0));
+            double itemValue = Math.max(0.0001, plugin.getConfig().getDouble("economy.item.value", 250.0));
             return Math.ceil(raw / itemValue);
         }
         return raw;
@@ -224,6 +224,18 @@ public final class EconomyService {
         return remaining == 0;
     }
 
+    private void refundItems(Player player, Material material, int amount) {
+        int remaining = amount;
+        int max = Math.max(1, material.getMaxStackSize());
+        while (remaining > 0) {
+            int stackAmount = Math.min(max, remaining);
+            var leftovers = player.getInventory().addItem(new ItemStack(material, stackAmount));
+            leftovers.values().forEach(stack -> player.getWorld().dropItemNaturally(player.getLocation(), stack));
+            remaining -= stackAmount;
+        }
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
     private boolean ensureVault() {
         if (vaultEconomy != null && vaultEconomyClass != null) return true;
         try {
