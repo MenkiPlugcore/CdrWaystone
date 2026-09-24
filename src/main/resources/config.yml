@@ -1,9 +1,16 @@
-# CdrWaystone v0.2.0
+# CdrWaystone v0.2.1
 # Paper 1.21.11 + Java 21
 
 waystones:
   auto-register-lodestones: true
   default-name: "Waystone"
+
+admin-waystones:
+  default-skin: divine
+  default-public: true
+  default-free: true
+  default-permanent: true
+  default-always-active: true
 
 warp:
   delay-seconds: 5
@@ -22,8 +29,6 @@ suppression:
   block: OBSIDIAN
 
 collision:
-  # The Lodestone is the lower collision block. A plugin-owned Barrier one
-  # block above gives the two-block-tall model a real collision body.
   enabled: true
 
 protection:
@@ -34,7 +39,6 @@ stability:
   health-check-seconds: 300
 
 gui:
-  # Right-click a CdrWaystone without a Waystone Key/Name Tag to open the UI.
   enabled: true
 
 portal-sickness:
