@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.6.2 - Simplified Waystone Travel
+
+- Retired the v0.6.1 Waystone Tier & Upgrade Progression system.
+- Removed TierService, TierCommand, tier command registration, tier permissions, tier GUI, tier route limits, tier cooldown modifiers, and tier travel-cost modifiers.
+- Removed tier metadata from the runtime data model and registry persistence.
+- Legacy `tier` fields from v0.6.1 are safely ignored on load and disappear the next time `waystones.yml` is saved.
+- Travel is now strictly Waystone-to-Waystone. A valid origin Waystone is required for every player teleport route.
+- Added origin proximity validation at route start and again immediately before teleport commit.
+- Players must remain within `network.origin-radius` of the origin Waystone until the countdown completes.
+- Portable/direct Waystone Key teleporting has been removed.
+- Waystone Keys now act as Network Keys: use one on an activated Waystone to open that Waystone's Network.
+- Existing bound Keys automatically have their legacy destination binding cleared when used.
+- Using a Waystone Key away from a Waystone now explains that travel must begin at a Waystone node.
+- Economy quotes now require both an origin Waystone and a destination Waystone.
+- Same-world pricing is always calculated from Waystone coordinates, never from the player's arbitrary position.
+- Default production economy provider changed to `VAULT` so travel uses server money instead of silently falling back to XP.
+- Default same-world price is 500 base cost plus 500 per 1,000 blocks.
+- Default cross-world surcharge is 5,000 in addition to the base cost.
+- Admin Waystones with `Free Travel = true` remain cost-free destinations.
+- Failed teleports still refund payment and do not consume dimensional power.
+- Premium Waystone GUI now focuses on Core state, activation, Network travel, ownership/access, economy, power, and skins.
+- Core activation, discovery, category filters, ownership, combat lock, cooldown, CdrKnockout integration, suppression, cross-world power, and Portal Sickness remain supported.
+
+## 0.6.1 - Waystone Tier & Upgrade Progression
+
+- Added experimental Waystone tiers: `AWAKENED`, `EMPOWERED`, `ANCIENT`, and `ASCENDED`.
+- Added tier-based travel range, cross-world access, cost multipliers, cooldown multipliers, GUI progression, upgrade requirements, and admin tier controls.
+- This system was intentionally retired in v0.6.2 after the project direction was simplified to paid Waystone-to-Waystone travel.
+
 ## 0.6.0 - Waystone Core & Activation Progression
 
 - Added persistent Waystone Core states: `DORMANT` and `ACTIVE`.
