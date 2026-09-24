@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.6.4 - Staff Furniture Waystones
+
+- Added `cdrwaystone.create`, default OP, as the only permission that converts a placed Lodestone into an official CdrWaystone.
+- Players without `cdrwaystone.create` can place and use normal vanilla Lodestones without CdrWaystone registering or changing them.
+- Replaced the manual `CustomStack -> Bukkit ItemDisplay` visual path with native ItemsAdder `CustomFurniture` spawning through a runtime adapter.
+- Staff-placed Lodestones are now placement triggers only. After the furniture is created successfully, the visible Lodestone is replaced by invisible Barrier interaction/collision anchors.
+- Existing registered v0.6.3 Lodestone Waystones are migrated automatically into furniture-backed Waystones when loaded/refreshed.
+- If ItemsAdder furniture cannot be created for a new staff placement, the registry entry is removed and the Lodestone is kept vanilla instead of creating a ghost Waystone.
+- Added persistent Waystone UUID markers to spawned furniture entities so interaction, protection and cleanup can map back to the correct registry node.
+- Added direct interaction and damage protection for registered Waystone furniture.
+- Network GUI and teleport validation now use registered Waystone anchors instead of requiring a visible Lodestone block.
+- Maintenance and chunk-load recovery now rebuild missing furniture while preserving registered anchors.
+- New staff-created Waystones are official ADMIN network nodes, active and public by default, paid by default, and removable by default while map setup is in progress.
+- Existing paid travel, Vault economy, simplified Network GUI, cooldown/combat/KO guards, teleport effects and screen-only feedback remain active.
+
+## 0.6.3 - Clean Network & Teleport Effects
+
+- Simplified normal Waystone interaction so it opens the destination Network directly instead of the legacy multi-menu management GUI.
+- Removed the legacy `WaystoneGui` runtime path from the plugin.
+- Expanded the clean Network list to up to 45 destinations per page with destination name, distance, travel cost and route status shown directly.
+- Added `FeedbackService` so normal gameplay state is presented through Action Bar and Title instead of chat spam.
+- Added `TeleportEffectService` with beacon-like END_ROD columns, rotating particle rings, departure bursts, arrival bursts and charging/deactivation sounds.
+- Added charging/cancel/arrival effects to the paid Waystone-to-Waystone teleport lifecycle.
+- Added configurable teleport-effect beam height and ring radius.
+- Added an ItemDisplay transform/scale attempt for the Vephilim skin models; this renderer is superseded by native ItemsAdder furniture in v0.6.4.
+
 ## 0.6.2 - Simplified Waystone Travel
 
 - Retired the v0.6.1 Waystone Tier & Upgrade Progression system.
@@ -18,7 +44,7 @@
 - Default production economy provider changed to `VAULT` so travel uses server money instead of silently falling back to XP.
 - Default same-world price is 500 base cost plus 500 per 1,000 blocks.
 - Default cross-world surcharge is 5,000 in addition to the base cost.
-- Admin Waystones with `Free Travel = true` remain cost-free destinations.
+- Admin Waystones with `Free Travel = true` bypass travel cost automatically.
 - Failed teleports still refund payment and do not consume dimensional power.
 - Premium Waystone GUI now focuses on Core state, activation, Network travel, ownership/access, economy, power, and skins.
 - Core activation, discovery, category filters, ownership, combat lock, cooldown, CdrKnockout integration, suppression, cross-world power, and Portal Sickness remain supported.
@@ -121,7 +147,6 @@
 - Player Waystones can now only be broken by their owner or an administrator.
 - Added configurable Player Waystone ownership limit, defaulting to 3 per player.
 - Added `cdrwaystone.limit.bypass` permission for unlimited placement.
-- Placement is rejected cleanly when a player reaches their Waystone limit.
 - Added `/cws access <private|trusted|public>`.
 - Added `/cws trust <player>`, `/cws untrust <player>`, and `/cws trusted`.
 - Trusting the first player automatically upgrades a PRIVATE Waystone to TRUSTED for easier setup.
