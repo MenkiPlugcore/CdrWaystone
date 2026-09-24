@@ -18,6 +18,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     private KeyService keys;
     private VisualService visuals;
     private TeleportService teleports;
+    private MaintenanceService maintenance;
     private Map<String, String> skins = new LinkedHashMap<>();
 
     @Override
@@ -31,6 +32,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         keys = new KeyService(this);
         visuals = new VisualService(this);
         teleports = new TeleportService(this);
+        maintenance = new MaintenanceService(this);
 
         getServer().getPluginManager().registerEvents(new WaystoneListener(this), this);
         CdrWaystoneCommand commandHandler = new CdrWaystoneCommand(this);
@@ -41,22 +43,29 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         }
 
         registerKeyRecipe();
-        Bukkit.getScheduler().runTaskLater(this, visuals::refreshAllLoaded, 80L);
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            visuals.refreshAllLoaded();
+            maintenance.start();
+        }, 80L);
         getLogger().info("CdrWaystone v" + getPluginMeta().getVersion() + " enabled with " + skins.size() + " skin(s).");
     }
 
     @Override
     public void onDisable() {
+        if (maintenance != null) maintenance.stop();
         if (registry != null) registry.save();
-        if (visuals != null && registry != null) {
-            for (WaystoneData data : registry.all()) visuals.remove(data);
-        }
+        // ItemDisplays are runtime-only. Remove only visuals on plugin unload;
+        // collision Barriers remain managed so a hot reload cannot expose/alter
+        // the structure between disable and enable.
+        if (visuals != null) visuals.removeAllVisualEntities();
     }
 
     public void reloadPlugin() {
         reloadConfig();
         loadSkins();
+        registerKeyRecipe();
         visuals.refreshAllLoaded();
+        if (maintenance != null) maintenance.start();
     }
 
     private void loadSkins() {
@@ -79,9 +88,10 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     }
 
     private void registerKeyRecipe() {
-        if (!getConfig().getBoolean("key.recipe-enabled", true)) return;
         NamespacedKey recipeKey = new NamespacedKey(this, "waystone_key");
         Bukkit.removeRecipe(recipeKey);
+        if (!getConfig().getBoolean("key.recipe-enabled", true)) return;
+
         ShapedRecipe recipe = new ShapedRecipe(recipeKey, keys.createKey());
         recipe.shape(" I ", "IRI", " I ");
         recipe.setIngredient('I', Material.IRON_INGOT);
@@ -93,5 +103,6 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     public KeyService keys() { return keys; }
     public VisualService visuals() { return visuals; }
     public TeleportService teleports() { return teleports; }
+    public MaintenanceService maintenance() { return maintenance; }
     public Map<String, String> skins() { return skins; }
 }
