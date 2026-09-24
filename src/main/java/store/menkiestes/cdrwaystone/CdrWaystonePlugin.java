@@ -17,7 +17,6 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     private WaystoneRegistry registry;
     private KeyService keys;
     private CoreService cores;
-    private TierService tiers;
     private VisualService visuals;
     private EconomyService economy;
     private TravelGuardService guards;
@@ -40,7 +39,6 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         registry.load();
         keys = new KeyService(this);
         cores = new CoreService(this);
-        tiers = new TierService(this);
         visuals = new VisualService(this);
         access = new AccessService(this);
         economy = new EconomyService(this);
@@ -55,23 +53,19 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new WaystoneListener(this), this);
         getServer().getPluginManager().registerEvents(gui, this);
         getServer().getPluginManager().registerEvents(networkGui, this);
+
         CdrWaystoneCommand commandHandler = new CdrWaystoneCommand(this);
         PluginCommand command = getCommand("cdrwaystone");
         if (command != null) {
             command.setExecutor(commandHandler);
             command.setTabCompleter(commandHandler);
         }
+
         CoreCommand coreHandler = new CoreCommand(this);
         PluginCommand coreCommand = getCommand("cdrwaystonecore");
         if (coreCommand != null) {
             coreCommand.setExecutor(coreHandler);
             coreCommand.setTabCompleter(coreHandler);
-        }
-        TierCommand tierHandler = new TierCommand(this);
-        PluginCommand tierCommand = getCommand("cdrwaystonetier");
-        if (tierCommand != null) {
-            tierCommand.setExecutor(tierHandler);
-            tierCommand.setTabCompleter(tierHandler);
         }
 
         registerKeyRecipe();
@@ -81,7 +75,10 @@ public final class CdrWaystonePlugin extends JavaPlugin {
             maintenance.start();
             discovery.start();
         }, 80L);
-        getLogger().info("CdrWaystone v" + getPluginMeta().getVersion() + " enabled with " + skins.size() + " skin(s). Economy: " + economy.providerLabel());
+
+        getLogger().info("CdrWaystone v" + getPluginMeta().getVersion()
+                + " enabled with " + skins.size() + " skin(s). Economy: " + economy.providerLabel()
+                + ". Travel mode: WAYSTONE_TO_WAYSTONE");
     }
 
     @Override
@@ -148,7 +145,6 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     public WaystoneRegistry registry() { return registry; }
     public KeyService keys() { return keys; }
     public CoreService cores() { return cores; }
-    public TierService tiers() { return tiers; }
     public VisualService visuals() { return visuals; }
     public EconomyService economy() { return economy; }
     public TravelGuardService guards() { return guards; }
