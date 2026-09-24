@@ -1,4 +1,4 @@
-# CdrWaystone v0.6.1
+# CdrWaystone v0.6.2
 # Paper 1.21.11 + Java 21
 
 waystones:
@@ -31,10 +31,10 @@ core:
   # Existing pre-v0.6.0 Waystones migrate as ACTIVE automatically.
   new-player-waystones: DORMANT
   new-admin-waystones: ACTIVE
-  # When enabled, Admin Waystones operate as ACTIVE infrastructure even if their stored state is Dormant.
+  # Server Admin Waystones can operate without a Core when enabled.
   admin-bypass: true
 
-  # The PDC-authenticated custom Core item.
+  # PDC-authenticated custom Core item.
   item-material: ECHO_SHARD
   recipe-enabled: true
   recipe:
@@ -46,78 +46,30 @@ core:
     edge: ENDER_PEARL
     center: HEART_OF_THE_SEA
 
-# Waystone Tier & Upgrade Progression
-# DORMANT is the Core state before tiers begin.
-# Active tiers: AWAKENED -> EMPOWERED -> ANCIENT -> ASCENDED
-tier:
-  enabled: true
-  default-player: AWAKENED
-  default-admin: ASCENDED
-  # Admin infrastructure behaves as ASCENDED when enabled.
-  admin-bypass: true
-
-  perks:
-    AWAKENED:
-      max-distance: 2000.0
-      cross-world: false
-      cost-multiplier: 1.25
-      cooldown-multiplier: 1.25
-    EMPOWERED:
-      max-distance: 5000.0
-      cross-world: false
-      cost-multiplier: 1.0
-      cooldown-multiplier: 1.0
-    ANCIENT:
-      # 0 = unlimited same-world range
-      max-distance: 0.0
-      cross-world: true
-      cost-multiplier: 0.85
-      cooldown-multiplier: 0.75
-    ASCENDED:
-      max-distance: 0.0
-      cross-world: true
-      cost-multiplier: 0.65
-      cooldown-multiplier: 0.50
-
-  upgrades:
-    EMPOWERED:
-      xp-levels: 10
-      items:
-        AMETHYST_SHARD: 16
-        ENDER_PEARL: 4
-    ANCIENT:
-      xp-levels: 20
-      items:
-        ECHO_SHARD: 8
-        HEART_OF_THE_SEA: 2
-    ASCENDED:
-      xp-levels: 30
-      items:
-        NETHER_STAR: 1
-        ECHO_SHARD: 16
-        AMETHYST_SHARD: 16
-
 discovery:
   enabled: true
   radius: 8.0
   scan-interval-ticks: 20
 
+# Travel is strictly Waystone -> Waystone.
+# The player must remain close to the origin Waystone until the countdown ends.
 network:
   enabled: true
   origin-radius: 6.5
   destinations-per-page: 28
 
 # Travel Cost & Economy Engine
-# Providers: AUTO, VAULT, XP_LEVELS, ITEM, NONE
-# AUTO uses Vault when an economy provider exists, otherwise XP_LEVELS.
+# Default production mode uses Vault money.
+# Optional compatible providers remain available: AUTO, VAULT, XP_LEVELS, ITEM, NONE.
 economy:
   enabled: true
-  provider: AUTO
+  provider: VAULT
 
   pricing:
-    base-cost: 0.0
-    # Added for cross-world travel instead of normal distance pricing.
-    cross-world-flat-cost: 1000.0
+    # Every paid route starts with this amount.
+    base-cost: 500.0
+    # Cross-world travel adds this flat amount instead of distance pricing.
+    cross-world-flat-cost: 5000.0
     minimum-cost: 0.0
     maximum-cost: 1000000.0
     # CEIL, FLOOR, ROUND, NONE
@@ -125,10 +77,11 @@ economy:
 
     distance:
       enabled: true
-      free-distance: 500.0
-      cost-per-1000-blocks: 250.0
+      # Same-world travel is billed from the origin Waystone to the destination Waystone.
+      free-distance: 0.0
+      cost-per-1000-blocks: 500.0
 
-    # Applied to the destination category before tier multipliers.
+    # Optional destination-category price multipliers.
     category-multipliers:
       CAPITAL: 1.0
       CITY: 1.0
@@ -139,11 +92,11 @@ economy:
       EVENT: 1.0
       OTHER: 1.0
 
-  # Used when provider is XP_LEVELS or AUTO falls back to XP_LEVELS.
+  # Compatibility settings if XP_LEVELS or AUTO is selected manually.
   xp:
     value-per-level: 250.0
 
-  # Used when provider is ITEM.
+  # Compatibility settings if ITEM is selected manually.
   item:
     material: EMERALD
     display-name: Emerald
@@ -153,8 +106,7 @@ economy:
 anti-abuse:
   cooldown:
     enabled: true
-    # Starts only after a successful Waystone teleport.
-    # Final cooldown is multiplied by the route Waystone tier.
+    # Starts only after a successful Waystone-to-Waystone teleport.
     seconds: 30
 
   combat:
@@ -216,6 +168,5 @@ visuals:
 
 key:
   material: COMPASS
-  name: "<light_purple>Waystone Key</light_purple>"
-  relinkable: true
+  name: "<light_purple>Waystone Network Key</light_purple>"
   recipe-enabled: true
