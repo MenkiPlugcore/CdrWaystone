@@ -29,13 +29,24 @@ public final class WaystoneListener implements Listener {
         if (event.getBlockPlaced().getType() != Material.LODESTONE) return;
         if (!event.getPlayer().hasPermission("cdrwaystone.use")) return;
         if (plugin.registry().find(event.getBlockPlaced().getLocation()) != null) return;
+
+        if (!plugin.access().canCreate(event.getPlayer())) {
+            event.setCancelled(true);
+            int limit = plugin.access().limit(event.getPlayer());
+            event.getPlayer().sendMessage("§cYou reached your Player Waystone limit (§f" + limit + "§c). Remove or transfer one first.");
+            return;
+        }
+
         String skin = plugin.getConfig().getString("visuals.default-skin", "andesite");
         String name = plugin.getConfig().getString("waystones.default-name", "Waystone");
         WaystoneData data = plugin.registry().create(event.getPlayer().getUniqueId(), event.getBlockPlaced().getLocation(), name, skin);
         plugin.discovery().setState(event.getPlayer().getUniqueId(), data.id(), DiscoveryService.State.ACTIVATED, true);
         plugin.visuals().ensureCollision(data);
         plugin.getServer().getScheduler().runTask(plugin, () -> plugin.visuals().spawn(data));
-        event.getPlayer().sendMessage("§aCdrWaystone created and activated. Skin: §f" + skin);
+        long owned = plugin.registry().countOwned(event.getPlayer().getUniqueId());
+        int limit = plugin.access().limit(event.getPlayer());
+        String count = limit < 0 ? owned + "/∞" : owned + "/" + limit;
+        event.getPlayer().sendMessage("§aCdrWaystone created and activated. §7Owned: §f" + count + " §7Access: §f" + data.accessMode());
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
@@ -47,6 +58,7 @@ public final class WaystoneListener implements Listener {
         }
         WaystoneData data = plugin.registry().find(block.getLocation());
         if (data == null) return;
+
         if (data.isAdmin()) {
             if (!event.getPlayer().hasPermission("cdrwaystone.admin")) {
                 event.setCancelled(true);
@@ -58,7 +70,12 @@ public final class WaystoneListener implements Listener {
                 event.getPlayer().sendMessage("§6This Admin Waystone is permanent. Use §f/cws admin remove§6 or disable Permanent first.");
                 return;
             }
+        } else if (!plugin.access().canManage(event.getPlayer(), data)) {
+            event.setCancelled(true);
+            event.getPlayer().sendMessage("§cOnly the owner can break this Player Waystone.");
+            return;
         }
+
         plugin.visuals().remove(data);
         plugin.registry().remove(data);
         plugin.discovery().forgetWaystone(data.id());
@@ -73,10 +90,18 @@ public final class WaystoneListener implements Listener {
         WaystoneData clickedWaystone = event.getClickedBlock() == null ? null : waystoneFromClickedBlock(event.getClickedBlock());
 
         if (clickedWaystone != null) {
+            if (!plugin.access().canAccess(player, clickedWaystone)) {
+                event.setCancelled(true);
+                if (clickedWaystone.isAdmin()) player.sendMessage("§cThis Admin Waystone is not public.");
+                else if (clickedWaystone.accessMode() == WaystoneData.AccessMode.TRUSTED) player.sendMessage("§cThis Waystone is restricted to trusted players.");
+                else player.sendMessage("§cThis is a private Player Waystone.");
+                return;
+            }
+
             plugin.discovery().discover(player, clickedWaystone, true);
 
             if (hand.getType() == Material.NAME_TAG && hand.hasItemMeta() && hand.getItemMeta().hasDisplayName()) {
-                if (!canManage(player, clickedWaystone)) {
+                if (!plugin.access().canManage(player, clickedWaystone)) {
                     player.sendMessage("§cYou cannot rename this Waystone."); event.setCancelled(true); return;
                 }
                 String newName = PlainTextComponentSerializer.plainText().serialize(hand.getItemMeta().displayName());
@@ -89,9 +114,6 @@ public final class WaystoneListener implements Listener {
 
             if (plugin.keys().isKey(hand)) {
                 if (!player.hasPermission("cdrwaystone.use")) return;
-                if (clickedWaystone.isAdmin() && !clickedWaystone.publicAccess() && !player.hasPermission("cdrwaystone.admin")) {
-                    player.sendMessage("§cThis Admin Waystone is private to server administration."); event.setCancelled(true); return;
-                }
                 if (!plugin.discovery().canUse(player, clickedWaystone)) {
                     player.sendMessage("§dThis Waystone must be activated first. §7Right-click it normally and use the Activate button.");
                     event.setCancelled(true); return;
@@ -128,6 +150,7 @@ public final class WaystoneListener implements Listener {
     public void onDamage(EntityDamageEvent event) {
         if (event.getEntity() instanceof Player player && plugin.getConfig().getBoolean("warp.damage-cancels", true)) plugin.teleports().cancel(player, "damaged");
     }
+
     @EventHandler(ignoreCancelled = true)
     public void onMove(PlayerMoveEvent event) {
         if (!plugin.getConfig().getBoolean("warp.movement-cancels", false) || !plugin.teleports().isWarping(event.getPlayer())) return;
@@ -135,6 +158,7 @@ public final class WaystoneListener implements Listener {
         if (start == null || event.getTo() == null) return;
         if (start.getBlockX()!=event.getTo().getBlockX() || start.getBlockY()!=event.getTo().getBlockY() || start.getBlockZ()!=event.getTo().getBlockZ()) plugin.teleports().cancel(event.getPlayer(), "moved");
     }
+
     @EventHandler public void onQuit(PlayerQuitEvent event) { plugin.teleports().cancel(event.getPlayer(), "disconnected"); }
 
     @EventHandler
@@ -157,10 +181,12 @@ public final class WaystoneListener implements Listener {
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH) public void onEntityExplode(EntityExplodeEvent event) { handleExplosion(event.blockList()); }
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH) public void onBlockExplode(BlockExplodeEvent event) { handleExplosion(event.blockList()); }
+
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
     public void onPistonExtend(BlockPistonExtendEvent event) {
         if (plugin.getConfig().getBoolean("protection.pistons", true) && event.getBlocks().stream().anyMatch(this::isManagedWaystoneBlock)) event.setCancelled(true);
     }
+
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
     public void onPistonRetract(BlockPistonRetractEvent event) {
         if (plugin.getConfig().getBoolean("protection.pistons", true) && event.getBlocks().stream().anyMatch(this::isManagedWaystoneBlock)) event.setCancelled(true);
@@ -195,10 +221,7 @@ public final class WaystoneListener implements Listener {
         }
         return null;
     }
+
     private boolean isManagedWaystoneBlock(Block block) { return dataFromManagedBlock(block) != null; }
     private WaystoneData waystoneFromClickedBlock(Block block) { return dataFromManagedBlock(block); }
-    private boolean canManage(Player player, WaystoneData data) {
-        if (data.isAdmin()) return player.hasPermission("cdrwaystone.admin");
-        return (data.owner() != null && data.owner().equals(player.getUniqueId())) || player.hasPermission("cdrwaystone.admin");
-    }
 }
