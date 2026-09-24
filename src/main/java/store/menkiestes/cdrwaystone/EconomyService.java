@@ -34,7 +34,9 @@ public final class EconomyService {
     }
 
     public Quote quote(Player player, WaystoneData origin, WaystoneData target) {
-        if (target == null || target.freeTravel() || !plugin.getConfig().getBoolean("economy.enabled", true)) {
+        if (target == null || target.freeTravel()
+                || (player != null && player.hasPermission("cdrwaystone.cost.bypass"))
+                || !plugin.getConfig().getBoolean("economy.enabled", true)) {
             return new Quote(0.0, 0.0, Provider.NONE, "FREE", true, true);
         }
 
