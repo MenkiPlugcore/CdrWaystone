@@ -1,7 +1,9 @@
-# CdrWaystone v0.6.3
+# CdrWaystone v0.6.4
 # Paper 1.21.11 + Java 21
 
 waystones:
+  # Only players with cdrwaystone.create are converted into CdrWaystones.
+  # Everyone else can place vanilla Lodestones normally.
   auto-register-lodestones: true
   default-name: "Waystone"
 
@@ -13,11 +15,14 @@ categories:
   default-player: PLAYER
   default-admin: CITY
 
+# Staff-created Waystones are official ADMIN network nodes.
 admin-waystones:
   default-skin: divine
   default-public: true
-  default-free: true
-  default-permanent: true
+  # Paid travel is the production default.
+  default-free: false
+  # New staff-placed nodes stay removable while setting up the map.
+  default-permanent: false
   default-always-active: true
   default-globally-discovered: true
 
@@ -41,7 +46,6 @@ discovery:
 network:
   enabled: true
   origin-radius: 6.5
-  # v0.6.3 GUI uses the first five rows for destinations.
   destinations-per-page: 45
 
 economy:
@@ -93,7 +97,6 @@ warp:
   allow-cross-world: true
   safe-radius: 3
 
-# Beacon-like charging and arrival visuals.
 teleport-effects:
   enabled: true
   beam-height: 5.0
@@ -107,6 +110,7 @@ suppression:
   enabled: true
   block: OBSIDIAN
 
+# Two invisible Barrier blocks are used as the interaction/collision anchor.
 collision:
   enabled: true
 
@@ -124,16 +128,12 @@ portal-sickness:
   blindness-seconds: 3
   damage: 5.0
 
-# ItemsAdder Waystone model presentation.
+# v0.6.4 uses native ItemsAdder CustomFurniture.
+# The plugin no longer extracts the custom item into its own Bukkit ItemDisplay.
 visuals:
   enabled: true
   default-skin: andesite
-  # FIXED is the correct static item-display context for the Vephilim Waystone models.
-  display-transform: FIXED
-  model-y-offset: 0.5
-  scale: 1.0
   rotation-degrees: 0.0
-  view-range: 1.5
 
 key:
   material: COMPASS
