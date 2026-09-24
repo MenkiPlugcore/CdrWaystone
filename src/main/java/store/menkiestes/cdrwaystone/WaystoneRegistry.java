@@ -52,8 +52,11 @@ public final class WaystoneRegistry {
                 boolean freeTravel = yaml.getBoolean(path + ".free", type == WaystoneData.Type.ADMIN);
                 boolean permanent = yaml.getBoolean(path + ".permanent", type == WaystoneData.Type.ADMIN);
                 boolean alwaysActive = yaml.getBoolean(path + ".always-active", type == WaystoneData.Type.ADMIN);
+                boolean globallyDiscovered = yaml.contains(path + ".globally-discovered")
+                        ? yaml.getBoolean(path + ".globally-discovered")
+                        : type == WaystoneData.Type.ADMIN && plugin.getConfig().getBoolean("admin-waystones.default-globally-discovered", true);
                 WaystoneData data = new WaystoneData(id, owner, worldId, worldName, x, y, z, name, skin, collisionOwned,
-                        type, publicAccess, freeTravel, permanent, alwaysActive);
+                        type, publicAccess, freeTravel, permanent, alwaysActive, globallyDiscovered);
                 byId.put(id, data);
                 byLocation.put(locationKey(worldId, x, y, z), id);
             } catch (Exception ex) {
@@ -78,6 +81,7 @@ public final class WaystoneRegistry {
             yaml.set(path + ".free", data.freeTravel());
             yaml.set(path + ".permanent", data.permanent());
             yaml.set(path + ".always-active", data.alwaysActive());
+            yaml.set(path + ".globally-discovered", data.globallyDiscovered());
         }
         File tempFile = new File(plugin.getDataFolder(), "waystones.yml.tmp");
         try {
@@ -93,15 +97,21 @@ public final class WaystoneRegistry {
     }
 
     public synchronized WaystoneData create(UUID owner, Location location, String name, String skin) {
-        return create(owner, location, name, skin, WaystoneData.Type.PLAYER, false, false, false, false);
+        return create(owner, location, name, skin, WaystoneData.Type.PLAYER, false, false, false, false, false);
     }
 
     public synchronized WaystoneData create(UUID owner, Location location, String name, String skin, WaystoneData.Type type,
                                              boolean publicAccess, boolean freeTravel, boolean permanent, boolean alwaysActive) {
+        return create(owner, location, name, skin, type, publicAccess, freeTravel, permanent, alwaysActive, false);
+    }
+
+    public synchronized WaystoneData create(UUID owner, Location location, String name, String skin, WaystoneData.Type type,
+                                             boolean publicAccess, boolean freeTravel, boolean permanent,
+                                             boolean alwaysActive, boolean globallyDiscovered) {
         UUID id = UUID.randomUUID();
         WaystoneData data = new WaystoneData(id, owner, location.getWorld().getUID(), location.getWorld().getName(),
                 location.getBlockX(), location.getBlockY(), location.getBlockZ(), name, skin, false,
-                type, publicAccess, freeTravel, permanent, alwaysActive);
+                type, publicAccess, freeTravel, permanent, alwaysActive, globallyDiscovered);
         byId.put(id, data);
         byLocation.put(locationKey(location), id);
         save();
