@@ -26,6 +26,8 @@ public final class TeleportService {
         NOT_DISCOVERED,
         NOT_ACTIVATED,
         SUPPRESSED,
+        TIER_RANGE,
+        TIER_CROSS_WORLD,
         CROSS_WORLD_DISABLED,
         NO_POWER,
         ECONOMY_UNAVAILABLE,
@@ -78,7 +80,7 @@ public final class TeleportService {
                 }
 
                 if (remaining <= 0) {
-                    TravelStatus routeStatus = travelStatusCore(player, target);
+                    TravelStatus routeStatus = travelStatusCore(player, target, origin);
                     if (!validateStatus(player, target, routeStatus)) { cleanup(player); cancel(); return; }
                     if (!quote.providerAvailable()) {
                         player.sendMessage("§cTravel economy provider became unavailable."); cleanup(player); cancel(); return;
@@ -93,7 +95,8 @@ public final class TeleportService {
                         player.sendMessage("§cNo safe destination found near that Waystone."); cleanup(player); cancel(); return;
                     }
 
-                    boolean crossWorld = !player.getWorld().getUID().equals(target.worldId());
+                    Location from = origin == null ? player.getLocation() : origin.location();
+                    boolean crossWorld = from == null || from.getWorld() == null || !from.getWorld().getUID().equals(target.worldId());
                     EconomyService.Payment payment = plugin.economy().charge(player, quote);
                     if (payment == null) {
                         player.sendMessage("§cTravel payment failed. No teleport was performed.");
@@ -109,7 +112,7 @@ public final class TeleportService {
                     }
 
                     consumePowerIfNeeded(target, crossWorld);
-                    plugin.guards().markTravelSuccess(player);
+                    plugin.guards().markTravelSuccess(player, origin == null ? target : origin);
                     if (payment.charged()) player.sendMessage("§aTravel paid: §f" + quote.formatted());
                     player.playSound(destination, Sound.BLOCK_PORTAL_TRAVEL, 0.6f, 1.2f);
                     applyPortalSickness(player);
@@ -141,7 +144,7 @@ public final class TeleportService {
     }
 
     public TravelStatus travelStatus(Player player, WaystoneData target, WaystoneData origin) {
-        TravelStatus core = travelStatusCore(player, target);
+        TravelStatus core = travelStatusCore(player, target, origin);
         if (core != TravelStatus.READY) return core;
 
         EconomyService.Quote quote = plugin.economy().quote(player, origin, target);
@@ -150,7 +153,7 @@ public final class TeleportService {
         return TravelStatus.READY;
     }
 
-    private TravelStatus travelStatusCore(Player player, WaystoneData target) {
+    private TravelStatus travelStatusCore(Player player, WaystoneData target, WaystoneData origin) {
         if (player == null || target == null) return TravelStatus.MISSING;
 
         TravelGuardService.GuardStatus guard = plugin.guards().status(player);
@@ -168,6 +171,15 @@ public final class TeleportService {
         if (targetLoc.getBlock().getType() != Material.LODESTONE) return TravelStatus.MISSING;
         if (!target.coreActive() && !(target.isAdmin() && plugin.getConfig().getBoolean("core.admin-bypass", true))) return TravelStatus.DORMANT;
 
+        if (origin != null) {
+            Location originLoc = origin.location();
+            if (originLoc == null || originLoc.getWorld() == null || originLoc.getBlock().getType() != Material.LODESTONE) return TravelStatus.MISSING;
+            if (!origin.coreActive() && !(origin.isAdmin() && plugin.getConfig().getBoolean("core.admin-bypass", true))) return TravelStatus.DORMANT;
+            if (!plugin.access().canAccess(player, origin)) return TravelStatus.NO_ACCESS;
+            if (!plugin.discovery().canUse(player, origin)) return TravelStatus.NOT_ACTIVATED;
+            if (!origin.alwaysActive() && isSuppressed(origin)) return TravelStatus.SUPPRESSED;
+        }
+
         if (!plugin.access().canAccess(player, target)) return TravelStatus.NO_ACCESS;
 
         if (!plugin.discovery().canUse(player, target)) {
@@ -177,7 +189,16 @@ public final class TeleportService {
 
         if (!target.alwaysActive() && isSuppressed(target)) return TravelStatus.SUPPRESSED;
 
-        boolean crossWorld = !player.getWorld().getUID().equals(target.worldId());
+        Location from = origin == null ? player.getLocation() : origin.location();
+        boolean crossWorld = from == null || from.getWorld() == null || !from.getWorld().getUID().equals(target.worldId());
+        WaystoneData routeNode = origin == null ? target : origin;
+
+        if (crossWorld && !plugin.tiers().allowsCrossWorld(routeNode)) return TravelStatus.TIER_CROSS_WORLD;
+        if (!crossWorld && from != null) {
+            double maxDistance = plugin.tiers().maxDistance(routeNode);
+            if (maxDistance > 0.0 && from.distanceSquared(targetLoc) > maxDistance * maxDistance) return TravelStatus.TIER_RANGE;
+        }
+
         if (crossWorld && !plugin.getConfig().getBoolean("warp.allow-cross-world", true)) return TravelStatus.CROSS_WORLD_DISABLED;
         if (!target.alwaysActive() && requiresPower(crossWorld) && !hasPower(target)) return TravelStatus.NO_POWER;
         return TravelStatus.READY;
@@ -193,6 +214,8 @@ public final class TeleportService {
             case NOT_DISCOVERED -> "Not discovered";
             case NOT_ACTIVATED -> "Not activated";
             case SUPPRESSED -> "Suppressed";
+            case TIER_RANGE -> "Tier range exceeded";
+            case TIER_CROSS_WORLD -> "Tier blocks cross-world";
             case CROSS_WORLD_DISABLED -> "Cross-world disabled";
             case NO_POWER -> "No dimensional power";
             case ECONOMY_UNAVAILABLE -> "Economy unavailable";
@@ -217,6 +240,8 @@ public final class TeleportService {
             case NOT_DISCOVERED -> player.sendMessage("§7You have not discovered that Waystone yet.");
             case NOT_ACTIVATED -> player.sendMessage("§dYou discovered that Waystone, but it has not been activated yet.");
             case SUPPRESSED -> player.sendMessage("§cThat Waystone is suppressed.");
+            case TIER_RANGE -> player.sendMessage("§eThis route exceeds the current Waystone tier range. §7Upgrade the route Waystone to travel farther.");
+            case TIER_CROSS_WORLD -> player.sendMessage("§eThis Waystone tier cannot open cross-world routes yet. §7Upgrade it to ANCIENT or higher.");
             case CROSS_WORLD_DISABLED -> player.sendMessage("§cCross-world Waystone travel is disabled.");
             case NO_POWER -> player.sendMessage("§cThat Waystone needs a charged Respawn Anchor below it.");
             case ECONOMY_UNAVAILABLE -> player.sendMessage("§cTravel economy provider is unavailable.");
