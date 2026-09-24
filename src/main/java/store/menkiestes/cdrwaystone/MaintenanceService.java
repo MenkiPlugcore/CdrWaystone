@@ -4,12 +4,10 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.scheduler.BukkitTask;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
- * Lightweight self-healing pass for changes that bypass Bukkit block events
- * (commands, WorldEdit-like tools, crash leftovers, or external plugins).
+ * Lightweight self-healing pass for changes that bypass Bukkit block events.
+ * v0.6.4 treats Barrier/AIR/legacy Lodestone anchors as recoverable and lets
+ * VisualService rebuild the native ItemsAdder furniture.
  */
 public final class MaintenanceService {
     private final CdrWaystonePlugin plugin;
@@ -34,29 +32,22 @@ public final class MaintenanceService {
     }
 
     public void runOnce() {
-        List<WaystoneData> stale = new ArrayList<>();
-
         for (WaystoneData data : plugin.registry().all()) {
             Location location = data.location();
             if (location == null || location.getWorld() == null) continue;
             if (!location.getWorld().isChunkLoaded(location.getBlockX() >> 4, location.getBlockZ() >> 4)) continue;
 
-            if (location.getBlock().getType() != Material.LODESTONE) {
-                plugin.visuals().remove(data);
-                stale.add(data);
+            Material type = location.getBlock().getType();
+            if (type != Material.BARRIER && type != Material.LODESTONE && type != Material.AIR) {
+                plugin.getLogger().warning("Waystone " + data.id() + " anchor is obstructed by " + type + ".");
                 continue;
             }
 
-            plugin.visuals().ensureCollision(data);
-            if (plugin.getConfig().getBoolean("visuals.enabled", true) && !plugin.visuals().hasVisual(data)) {
-                plugin.visuals().spawn(data);
+            if (!plugin.visuals().isAnchorValid(data) || !plugin.visuals().hasVisual(data)) {
+                plugin.visuals().materialize(data);
+            } else {
+                plugin.visuals().ensureCollision(data);
             }
-        }
-
-        if (!stale.isEmpty()) {
-            for (WaystoneData data : stale) plugin.registry().remove(data, false);
-            plugin.registry().save();
-            plugin.getLogger().warning("Stability check removed " + stale.size() + " stale Waystone entr" + (stale.size() == 1 ? "y." : "ies."));
         }
     }
 }
