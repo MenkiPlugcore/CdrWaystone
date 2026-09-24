@@ -127,16 +127,16 @@ public final class DiscoveryService {
 
     public boolean activate(Player player, WaystoneData data) {
         if (!data.coreActive() && !(data.isAdmin() && plugin.getConfig().getBoolean("core.admin-bypass", true))) {
-            player.sendMessage("§5This Waystone is Dormant. §7Install a §dWaystone Core§7 before attuning to it.");
+            plugin.feedback().action(player, "§5Dormant Waystone §7• §dCore required");
             return false;
         }
         if (!plugin.getConfig().getBoolean("discovery.enabled", true)) return true;
         if (!plugin.access().canAccess(player, data)) {
-            player.sendMessage("§cYou do not have access to this Waystone.");
+            plugin.feedback().action(player, "§cAccess denied");
             return false;
         }
         if (!player.hasPermission("cdrwaystone.admin") && status(player, data) == State.UNKNOWN) {
-            player.sendMessage("§7You have not discovered this Waystone yet.");
+            plugin.feedback().action(player, "§7Waystone not discovered yet");
             return false;
         }
         if (status(player, data) == State.ACTIVATED) return true;
@@ -144,10 +144,9 @@ public final class DiscoveryService {
         player.showTitle(Title.title(
                 Component.text("✦ WAYSTONE ACTIVATED ✦"),
                 Component.text(data.name()),
-                Title.Times.times(Duration.ofMillis(250), Duration.ofMillis(1600), Duration.ofMillis(450))
+                Title.Times.times(Duration.ofMillis(250), Duration.ofMillis(1400), Duration.ofMillis(400))
         ));
         player.playSound(player.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 0.9f, 1.15f);
-        player.sendMessage("§dWaystone activated: §f" + data.name());
         return true;
     }
 
@@ -194,9 +193,7 @@ public final class DiscoveryService {
                 Location location = data.location();
                 if (location == null || !location.getWorld().equals(player.getWorld())) continue;
                 Location center = location.clone().add(0.5, 0.5, 0.5);
-                if (player.getLocation().distanceSquared(center) <= radiusSquared) {
-                    discover(player, data, true);
-                }
+                if (player.getLocation().distanceSquared(center) <= radiusSquared) discover(player, data, true);
             }
         }
     }
@@ -205,10 +202,9 @@ public final class DiscoveryService {
         player.showTitle(Title.title(
                 Component.text("✦ WAYSTONE DISCOVERED ✦"),
                 Component.text(data.name()),
-                Title.Times.times(Duration.ofMillis(250), Duration.ofMillis(1800), Duration.ofMillis(450))
+                Title.Times.times(Duration.ofMillis(250), Duration.ofMillis(1600), Duration.ofMillis(400))
         ));
         player.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_RESONATE, 0.8f, 0.85f);
-        String suffix = data.coreActive() ? "Right-click it to activate." : "This Waystone is Dormant and needs a Waystone Core.";
-        player.sendMessage("§5Discovered §f" + data.name() + "§5. §7" + suffix);
+        plugin.feedback().action(player, data.coreActive() ? "§dRight-click to activate" : "§5Dormant §7• §dWaystone Core required");
     }
 }
