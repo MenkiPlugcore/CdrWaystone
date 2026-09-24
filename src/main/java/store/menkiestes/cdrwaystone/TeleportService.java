@@ -42,9 +42,15 @@ public final class TeleportService {
     private final Map<UUID, Location> startLocations = new HashMap<>();
     private final Map<UUID, WaystoneData> activeOrigins = new HashMap<>();
 
-    public TeleportService(CdrWaystonePlugin plugin) { this.plugin = plugin; }
-    public boolean isWarping(Player player) { return active.containsKey(player.getUniqueId()); }
+    public TeleportService(CdrWaystonePlugin plugin) {
+        this.plugin = plugin;
+    }
 
+    public boolean isWarping(Player player) {
+        return active.containsKey(player.getUniqueId());
+    }
+
+    /** Portable travel is intentionally disabled. */
     public void start(Player player, WaystoneData target) {
         plugin.feedback().action(player, "§cTravel must begin at a Waystone");
     }
@@ -55,8 +61,8 @@ public final class TeleportService {
             return;
         }
 
-        TravelStatus initialStatus = travelStatus(player, target, origin);
-        if (!validateStatus(player, target, initialStatus)) return;
+        TravelStatus initial = travelStatus(player, target, origin);
+        if (!validateStatus(player, initial)) return;
 
         EconomyService.Quote quote = plugin.economy().quote(player, origin, target);
         if (!quote.providerAvailable()) {
@@ -79,78 +85,81 @@ public final class TeleportService {
             @Override
             public void run() {
                 if (!player.isOnline()) {
-                    plugin.effects().stop(player);
                     cleanup(player);
                     cancel();
                     return;
                 }
 
-                TravelGuardService.GuardStatus guardStatus = plugin.guards().status(player);
-                if (guardStatus != TravelGuardService.GuardStatus.READY) {
-                    fail(player, origin, plugin.guards().label(player, guardStatus));
+                TravelGuardService.GuardStatus guard = plugin.guards().status(player);
+                if (guard != TravelGuardService.GuardStatus.READY) {
+                    fail(player, origin, plugin.guards().label(player, guard));
                     cancel();
                     return;
                 }
 
-                if (remaining <= 0) {
-                    TravelStatus routeStatus = travelStatusCore(player, target, origin);
-                    if (routeStatus != TravelStatus.READY) {
-                        plugin.effects().cancel(player, origin);
-                        validateStatus(player, target, routeStatus);
-                        cleanup(player);
-                        cancel();
-                        return;
-                    }
-                    if (!quote.providerAvailable()) {
-                        fail(player, origin, "Economy unavailable");
-                        cancel();
-                        return;
-                    }
-                    if (!plugin.economy().canAfford(player, quote)) {
-                        fail(player, origin, "Insufficient funds • Need " + quote.formatted());
-                        cancel();
-                        return;
-                    }
+                if (remaining > 0) {
+                    String action = "§dCharging §f" + origin.name() + " §8→ §f" + target.name()
+                            + " §8• §f" + remaining + "s";
+                    if (!quote.free()) action += " §8• §f" + quote.formatted();
+                    plugin.feedback().action(player, action);
+                    plugin.effects().pulse(player, origin);
+                    remaining--;
+                    return;
+                }
 
-                    Location destination = safeDestination(target);
-                    if (destination == null) {
-                        fail(player, origin, "No safe arrival point");
-                        cancel();
-                        return;
-                    }
-
-                    boolean crossWorld = !origin.worldId().equals(target.worldId());
-                    EconomyService.Payment payment = plugin.economy().charge(player, quote);
-                    if (payment == null) {
-                        fail(player, origin, "Payment failed");
-                        cancel();
-                        return;
-                    }
-
-                    plugin.effects().depart(player, origin);
+                TravelStatus finalStatus = travelStatusCore(player, target, origin);
+                if (finalStatus != TravelStatus.READY) {
+                    plugin.effects().cancel(player, origin);
+                    validateStatus(player, finalStatus);
                     cleanup(player);
                     cancel();
-
-                    if (!player.teleport(destination)) {
-                        plugin.economy().refund(player, payment);
-                        plugin.feedback().action(player, "§cTeleport failed §7• Payment refunded");
-                        return;
-                    }
-
-                    consumePowerIfNeeded(target, crossWorld);
-                    plugin.guards().markTravelSuccess(player);
-                    plugin.effects().arrive(player, target);
-                    plugin.feedback().title(player, "§d§lTRAVEL COMPLETE", "§f" + target.name(), 120, 900, 300);
-                    if (payment.charged()) plugin.feedback().action(player, "§7Paid §f" + quote.formatted() + " §8• §d" + target.name());
-                    applyPortalSickness(player);
                     return;
                 }
 
-                String action = "§dCharging §f" + origin.name() + " §8→ §f" + target.name() + " §8• §f" + remaining + "s";
-                if (!quote.free()) action += " §8• §f" + quote.formatted();
-                plugin.feedback().action(player, action);
-                plugin.effects().pulse(player, origin);
-                remaining--;
+                if (!quote.providerAvailable()) {
+                    fail(player, origin, "Economy unavailable");
+                    cancel();
+                    return;
+                }
+                if (!plugin.economy().canAfford(player, quote)) {
+                    fail(player, origin, "Insufficient funds • Need " + quote.formatted());
+                    cancel();
+                    return;
+                }
+
+                Location destination = safeDestination(target);
+                if (destination == null) {
+                    fail(player, origin, "No safe arrival point");
+                    cancel();
+                    return;
+                }
+
+                boolean crossWorld = !origin.worldId().equals(target.worldId());
+                EconomyService.Payment payment = plugin.economy().charge(player, quote);
+                if (payment == null) {
+                    fail(player, origin, "Payment failed");
+                    cancel();
+                    return;
+                }
+
+                plugin.effects().depart(player, origin);
+                cleanup(player);
+                cancel();
+
+                if (!player.teleport(destination)) {
+                    plugin.economy().refund(player, payment);
+                    plugin.feedback().action(player, "§cTeleport failed §7• Payment refunded");
+                    return;
+                }
+
+                consumePowerIfNeeded(target, crossWorld);
+                plugin.guards().markTravelSuccess(player);
+                plugin.effects().arrive(player, target);
+                plugin.feedback().title(player, "§d§lTRAVEL COMPLETE", "§f" + target.name(), 120, 900, 300);
+                if (payment.charged()) {
+                    plugin.feedback().action(player, "§7Paid §f" + quote.formatted() + " §8• §d" + target.name());
+                }
+                applyPortalSickness(player);
             }
         }.runTaskTimer(plugin, 0L, 20L);
 
@@ -161,11 +170,10 @@ public final class TeleportService {
         BukkitTask task = active.remove(player.getUniqueId());
         WaystoneData origin = activeOrigins.remove(player.getUniqueId());
         startLocations.remove(player.getUniqueId());
-        if (task != null) {
-            task.cancel();
-            plugin.effects().cancel(player, origin);
-            if (player.isOnline()) plugin.feedback().action(player, "§cTeleport cancelled §7• §f" + reason);
-        }
+        if (task == null) return;
+        task.cancel();
+        plugin.effects().cancel(player, origin);
+        if (player.isOnline()) plugin.feedback().action(player, "§cTeleport cancelled §7• §f" + reason);
     }
 
     public void cancelAll() {
@@ -175,7 +183,9 @@ public final class TeleportService {
         activeOrigins.clear();
     }
 
-    public Location startLocation(Player player) { return startLocations.get(player.getUniqueId()); }
+    public Location startLocation(Player player) {
+        return startLocations.get(player.getUniqueId());
+    }
 
     private void cleanup(Player player) {
         active.remove(player.getUniqueId());
@@ -221,8 +231,12 @@ public final class TeleportService {
 
         Location originLoc = origin.location();
         Location targetLoc = target.location();
-        if (originLoc == null || targetLoc == null || originLoc.getWorld() == null || targetLoc.getWorld() == null) return TravelStatus.WORLD_UNAVAILABLE;
-        if (originLoc.getBlock().getType() != Material.LODESTONE || targetLoc.getBlock().getType() != Material.LODESTONE) return TravelStatus.MISSING;
+        if (originLoc == null || targetLoc == null || originLoc.getWorld() == null || targetLoc.getWorld() == null) {
+            return TravelStatus.WORLD_UNAVAILABLE;
+        }
+        if (!plugin.visuals().isAnchorValid(origin) || !plugin.visuals().isAnchorValid(target)) {
+            return TravelStatus.MISSING;
+        }
         if (!coreOperational(origin) || !coreOperational(target)) return TravelStatus.DORMANT;
 
         if (!plugin.access().canAccess(player, origin)) return TravelStatus.NO_ACCESS;
@@ -238,8 +252,11 @@ public final class TeleportService {
         if (!target.alwaysActive() && isSuppressed(target)) return TravelStatus.SUPPRESSED;
 
         boolean crossWorld = !origin.worldId().equals(target.worldId());
-        if (crossWorld && !plugin.getConfig().getBoolean("warp.allow-cross-world", true)) return TravelStatus.CROSS_WORLD_DISABLED;
+        if (crossWorld && !plugin.getConfig().getBoolean("warp.allow-cross-world", true)) {
+            return TravelStatus.CROSS_WORLD_DISABLED;
+        }
         if (!target.alwaysActive() && requiresPower(crossWorld) && !hasPower(target)) return TravelStatus.NO_POWER;
+
         return TravelStatus.READY;
     }
 
@@ -266,7 +283,7 @@ public final class TeleportService {
         };
     }
 
-    private boolean validateStatus(Player player, WaystoneData target, TravelStatus status) {
+    private boolean validateStatus(Player player, TravelStatus status) {
         if (status == TravelStatus.READY) return true;
         String text = switch (status) {
             case ORIGIN_REQUIRED -> "Travel must begin at a Waystone";
@@ -345,10 +362,9 @@ public final class TeleportService {
 
     private Location safeDestination(WaystoneData target) {
         Location base = target.location();
-        if (base == null) return null;
+        if (base == null || base.getWorld() == null) return null;
         int radius = Math.max(1, plugin.getConfig().getInt("warp.safe-radius", 3));
         World world = base.getWorld();
-        if (world == null) return null;
 
         for (int r = 1; r <= radius; r++) {
             for (int dx = -r; dx <= r; dx++) {
@@ -363,6 +379,7 @@ public final class TeleportService {
                 }
             }
         }
+        // Two Barrier anchors occupy y and y+1. Fallback safely lands above them.
         return base.clone().add(0.5, 2.05, 0.5);
     }
 
@@ -370,10 +387,17 @@ public final class TeleportService {
         if (!plugin.getConfig().getBoolean("portal-sickness.enabled", true)) return;
         double chance = plugin.getConfig().getDouble("portal-sickness.chance", 0.05);
         if (ThreadLocalRandom.current().nextDouble() >= chance) return;
+
         PotionEffectType nausea = PotionEffectType.getByName("NAUSEA");
         PotionEffectType blindness = PotionEffectType.getByName("BLINDNESS");
-        if (nausea != null) player.addPotionEffect(new PotionEffect(nausea, plugin.getConfig().getInt("portal-sickness.nausea-seconds", 15) * 20, 0));
-        if (blindness != null) player.addPotionEffect(new PotionEffect(blindness, plugin.getConfig().getInt("portal-sickness.blindness-seconds", 3) * 20, 0));
+        if (nausea != null) {
+            player.addPotionEffect(new PotionEffect(nausea,
+                    plugin.getConfig().getInt("portal-sickness.nausea-seconds", 15) * 20, 0));
+        }
+        if (blindness != null) {
+            player.addPotionEffect(new PotionEffect(blindness,
+                    plugin.getConfig().getInt("portal-sickness.blindness-seconds", 3) * 20, 0));
+        }
         double damage = plugin.getConfig().getDouble("portal-sickness.damage", 5.0);
         if (damage > 0) player.damage(damage);
         plugin.feedback().action(player, "§5Portal sickness");
