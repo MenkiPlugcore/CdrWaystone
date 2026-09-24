@@ -1,4 +1,4 @@
-# CdrWaystone v0.3.1
+# CdrWaystone v0.4.0
 # Paper 1.21.11 + Java 21
 
 waystones:
@@ -28,6 +28,13 @@ discovery:
   radius: 8.0
   # 20 ticks = 1 second. Minimum runtime value is 20 ticks.
   scan-interval-ticks: 20
+
+network:
+  enabled: true
+  # Player must remain this close to the origin Waystone while using the Network GUI.
+  origin-radius: 6.5
+  # Maximum supported value is 28 because the premium GUI reserves navigation slots.
+  destinations-per-page: 28
 
 warp:
   delay-seconds: 5
