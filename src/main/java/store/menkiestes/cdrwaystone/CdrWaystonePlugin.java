@@ -16,6 +16,7 @@ import java.util.Map;
 public final class CdrWaystonePlugin extends JavaPlugin {
     private WaystoneRegistry registry;
     private KeyService keys;
+    private CoreService cores;
     private VisualService visuals;
     private EconomyService economy;
     private TravelGuardService guards;
@@ -37,6 +38,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         registry = new WaystoneRegistry(this);
         registry.load();
         keys = new KeyService(this);
+        cores = new CoreService(this);
         visuals = new VisualService(this);
         access = new AccessService(this);
         economy = new EconomyService(this);
@@ -59,6 +61,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         }
 
         registerKeyRecipe();
+        cores.registerRecipe();
         Bukkit.getScheduler().runTaskLater(this, () -> {
             visuals.refreshAllLoaded();
             maintenance.start();
@@ -86,6 +89,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         if (economy != null) economy.reload();
         if (guards != null) guards.reload();
         registerKeyRecipe();
+        if (cores != null) cores.registerRecipe();
         visuals.refreshAllLoaded();
         if (maintenance != null) maintenance.start();
         if (discovery != null) discovery.start();
@@ -129,6 +133,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
 
     public WaystoneRegistry registry() { return registry; }
     public KeyService keys() { return keys; }
+    public CoreService cores() { return cores; }
     public VisualService visuals() { return visuals; }
     public EconomyService economy() { return economy; }
     public TravelGuardService guards() { return guards; }
