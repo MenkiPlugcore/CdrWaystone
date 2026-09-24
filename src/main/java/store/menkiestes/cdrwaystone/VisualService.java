@@ -1,50 +1,67 @@
 package store.menkiestes.cdrwaystone;
 
 import org.bukkit.*;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.util.Transformation;
 import org.joml.AxisAngle4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class VisualService {
     private final CdrWaystonePlugin plugin;
     private final NamespacedKey visualMarker;
+    private final NamespacedKey visualIdMarker;
     private Method customStackGetInstance;
     private Method customStackGetItemStack;
 
     public VisualService(CdrWaystonePlugin plugin) {
         this.plugin = plugin;
         this.visualMarker = new NamespacedKey(plugin, "waystone_visual");
+        this.visualIdMarker = new NamespacedKey(plugin, "waystone_visual_id");
     }
 
     public void refreshAllLoaded() {
-        for (World world : Bukkit.getWorlds()) {
-            for (ItemDisplay entity : world.getEntitiesByClass(ItemDisplay.class)) {
-                if (isOurVisual(entity)) entity.remove();
-            }
-        }
+        removeAllVisualEntities();
+        List<WaystoneData> invalid = new ArrayList<>();
+
         for (WaystoneData data : plugin.registry().all()) {
             Location location = data.location();
-            if (location != null && isChunkLoaded(location)) {
-                ensureCollision(data);
-                spawn(data);
+            if (location == null || !isChunkLoaded(location)) continue;
+            if (location.getBlock().getType() != Material.LODESTONE) {
+                removeCollision(data);
+                invalid.add(data);
+                continue;
             }
+            ensureCollision(data);
+            spawn(data);
+        }
+
+        if (!invalid.isEmpty()) {
+            for (WaystoneData data : invalid) plugin.registry().remove(data, false);
+            plugin.registry().save();
+            plugin.getLogger().warning("Pruned " + invalid.size() + " stale Waystone registry entr" + (invalid.size() == 1 ? "y." : "ies."));
         }
     }
 
     public void spawn(WaystoneData data) {
-        if (!plugin.getConfig().getBoolean("visuals.enabled", true)) return;
+        if (!plugin.getConfig().getBoolean("visuals.enabled", true)) {
+            removeVisual(data);
+            return;
+        }
         Location base = data.location();
         if (base == null || !isChunkLoaded(base)) return;
         if (base.getBlock().getType() != Material.LODESTONE) return;
 
-        removeNear(base);
+        removeVisual(data);
         String itemId = plugin.skins().get(data.skin());
         if (itemId == null) itemId = plugin.skins().get(plugin.getConfig().getString("visuals.default-skin", "andesite"));
         ItemStack modelItem = getItemsAdderItem(itemId);
@@ -65,6 +82,7 @@ public final class VisualService {
             display.setViewRange(viewRange);
             display.setPersistent(false);
             display.getPersistentDataContainer().set(visualMarker, PersistentDataType.BYTE, (byte) 1);
+            display.getPersistentDataContainer().set(visualIdMarker, PersistentDataType.STRING, data.id().toString());
             Transformation old = display.getTransformation();
             display.setTransformation(new Transformation(
                     old.getTranslation(),
@@ -75,17 +93,51 @@ public final class VisualService {
         });
     }
 
+    public boolean hasVisual(WaystoneData data) {
+        Location base = data.location();
+        if (base == null || !isChunkLoaded(base)) return false;
+        String id = data.id().toString();
+        Location center = base.clone().add(0.5, 1.0, 0.5);
+        for (Entity entity : base.getWorld().getNearbyEntities(center, 1.25, 3.0, 1.25)) {
+            String visualId = entity.getPersistentDataContainer().get(visualIdMarker, PersistentDataType.STRING);
+            if (id.equals(visualId) && isOurVisual(entity)) return true;
+        }
+        return false;
+    }
+
     public void remove(WaystoneData data) {
-        Location location = data.location();
-        if (location == null) return;
-        removeNear(location);
+        removeVisual(data);
         removeCollision(data);
     }
 
-    public void removeNear(Location base) {
+    public void removeVisual(WaystoneData data) {
+        Location base = data.location();
         if (base == null || !isChunkLoaded(base)) return;
-        for (Entity entity : base.getWorld().getNearbyEntities(base.clone().add(0.5, 1.0, 0.5), 2.0, 3.0, 2.0)) {
-            if (isOurVisual(entity)) entity.remove();
+        String id = data.id().toString();
+        Location center = base.clone().add(0.5, 1.0, 0.5);
+        for (Entity entity : base.getWorld().getNearbyEntities(center, 1.25, 3.0, 1.25)) {
+            if (!isOurVisual(entity)) continue;
+            String visualId = entity.getPersistentDataContainer().get(visualIdMarker, PersistentDataType.STRING);
+            if (id.equals(visualId)) {
+                entity.remove();
+                continue;
+            }
+            // v0.1.0 visuals had no per-Waystone ID. Only clean a legacy visual
+            // when it is physically centered on this Waystone.
+            if (visualId == null) {
+                Location entityLoc = entity.getLocation();
+                double dx = entityLoc.getX() - (base.getBlockX() + 0.5);
+                double dz = entityLoc.getZ() - (base.getBlockZ() + 0.5);
+                if ((dx * dx + dz * dz) <= 0.36) entity.remove();
+            }
+        }
+    }
+
+    public void removeAllVisualEntities() {
+        for (World world : Bukkit.getWorlds()) {
+            for (ItemDisplay entity : world.getEntitiesByClass(ItemDisplay.class)) {
+                if (isOurVisual(entity)) entity.remove();
+            }
         }
     }
 
@@ -99,25 +151,42 @@ public final class VisualService {
     }
 
     public void ensureCollision(WaystoneData data) {
-        if (!plugin.getConfig().getBoolean("collision.enabled", true)) return;
         Location base = data.location();
         if (base == null || !isChunkLoaded(base)) return;
-        Material current = base.clone().add(0, 1, 0).getBlock().getType();
-        if (current == Material.AIR || current == Material.BARRIER) {
-            base.clone().add(0, 1, 0).getBlock().setType(Material.BARRIER, false);
+        if (base.getBlock().getType() != Material.LODESTONE) return;
+
+        if (!plugin.getConfig().getBoolean("collision.enabled", true)) {
+            removeCollision(data);
+            return;
+        }
+
+        Block top = base.clone().add(0, 1, 0).getBlock();
+        Material current = top.getType();
+        if (current == Material.AIR) {
+            top.setType(Material.BARRIER, false);
+            if (!data.collisionOwned()) {
+                data.collisionOwned(true);
+                plugin.registry().save();
+            }
+        } else if (current != Material.BARRIER && data.collisionOwned()) {
+            data.collisionOwned(false);
+            plugin.registry().save();
+            plugin.getLogger().warning("Collision disabled for Waystone " + data.id() + " because the block above it is occupied by " + current + ".");
         }
     }
 
     public void removeCollision(WaystoneData data) {
+        if (!data.collisionOwned()) return;
         Location base = data.location();
         if (base == null || !isChunkLoaded(base)) return;
-        if (base.clone().add(0, 1, 0).getBlock().getType() == Material.BARRIER) {
-            base.clone().add(0, 1, 0).getBlock().setType(Material.AIR, false);
-        }
+        Block top = base.clone().add(0, 1, 0).getBlock();
+        if (top.getType() == Material.BARRIER) top.setType(Material.AIR, false);
+        data.collisionOwned(false);
     }
 
     private ItemStack getItemsAdderItem(String id) {
-        if (id == null || Bukkit.getPluginManager().getPlugin("ItemsAdder") == null) return null;
+        Plugin itemsAdder = Bukkit.getPluginManager().getPlugin("ItemsAdder");
+        if (id == null || itemsAdder == null || !itemsAdder.isEnabled()) return null;
         try {
             if (customStackGetInstance == null || customStackGetItemStack == null) {
                 Class<?> clazz = Class.forName("dev.lone.itemsadder.api.CustomStack");
