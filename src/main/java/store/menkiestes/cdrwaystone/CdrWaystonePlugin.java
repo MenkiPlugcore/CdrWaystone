@@ -19,6 +19,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     private VisualService visuals;
     private TeleportService teleports;
     private MaintenanceService maintenance;
+    private DiscoveryService discovery;
     private WaystoneGui gui;
     private Map<String, String> skins = new LinkedHashMap<>();
 
@@ -35,6 +36,8 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         visuals = new VisualService(this);
         teleports = new TeleportService(this);
         maintenance = new MaintenanceService(this);
+        discovery = new DiscoveryService(this);
+        discovery.load();
         gui = new WaystoneGui(this);
 
         getServer().getPluginManager().registerEvents(new WaystoneListener(this), this);
@@ -50,12 +53,17 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         Bukkit.getScheduler().runTaskLater(this, () -> {
             visuals.refreshAllLoaded();
             maintenance.start();
+            discovery.start();
         }, 80L);
         getLogger().info("CdrWaystone v" + getPluginMeta().getVersion() + " enabled with " + skins.size() + " skin(s).");
     }
 
     @Override
     public void onDisable() {
+        if (discovery != null) {
+            discovery.stop();
+            discovery.save();
+        }
         if (maintenance != null) maintenance.stop();
         if (teleports != null) teleports.cancelAll();
         if (registry != null) registry.save();
@@ -69,6 +77,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         registerKeyRecipe();
         visuals.refreshAllLoaded();
         if (maintenance != null) maintenance.start();
+        if (discovery != null) discovery.start();
     }
 
     private void mergeConfigDefaults() {
@@ -112,6 +121,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     public VisualService visuals() { return visuals; }
     public TeleportService teleports() { return teleports; }
     public MaintenanceService maintenance() { return maintenance; }
+    public DiscoveryService discovery() { return discovery; }
     public WaystoneGui gui() { return gui; }
     public Map<String, String> skins() { return skins; }
 }
