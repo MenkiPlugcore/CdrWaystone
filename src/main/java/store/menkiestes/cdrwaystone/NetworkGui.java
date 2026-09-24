@@ -34,11 +34,13 @@ public final class NetworkGui implements Listener {
         this.targetKey = new NamespacedKey(plugin, "network_target");
     }
 
-    public void open(Player player, WaystoneData origin) { open(player, origin, 0); }
+    public void open(Player player, WaystoneData origin) {
+        open(player, origin, 0);
+    }
 
     public void open(Player player, WaystoneData origin, int requestedPage) {
         if (!plugin.getConfig().getBoolean("network.enabled", true)) {
-            plugin.feedback().action(player, "§cWaystone Network is disabled");
+            plugin.feedback().action(player, "§cWaystone Network disabled");
             return;
         }
         if (!canUseOrigin(player, origin, true)) return;
@@ -51,31 +53,28 @@ public final class NetworkGui implements Listener {
 
         NetworkHolder holder = new NetworkHolder(origin.id(), page);
         Inventory inv = Bukkit.createInventory(holder, 54,
-                Component.text("✦ " + origin.name() + "  →  WAYSTONES", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD));
+                Component.text("✦ " + origin.name() + " → WAYSTONES", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD));
         holder.inventory = inv;
 
         int start = page * perPage;
         int end = Math.min(destinations.size(), start + perPage);
         for (int index = start; index < end; index++) {
-            int slot = DESTINATION_SLOTS[index - start];
             WaystoneData target = destinations.get(index);
-            inv.setItem(slot, destinationItem(player, origin, target));
+            inv.setItem(DESTINATION_SLOTS[index - start], destinationItem(player, origin, target));
         }
 
         if (destinations.isEmpty()) {
             inv.setItem(22, item(Material.GRAY_DYE, "No Active Destinations", NamedTextColor.GRAY,
-                    "No other active Waystones are available", "Discover and activate another Waystone first"));
+                    "No other activated Waystones are available"));
         }
 
-        ItemStack filler = filler(Material.BLACK_STAINED_GLASS_PANE);
+        ItemStack filler = filler();
         for (int slot = 45; slot < 54; slot++) inv.setItem(slot, filler);
         if (page > 0) inv.setItem(45, item(Material.ARROW, "Previous", NamedTextColor.YELLOW, "Page " + page + " / " + pages));
-        inv.setItem(47, item(origin.isAdmin() ? Material.NETHER_STAR : Material.LODESTONE,
-                origin.name(), origin.isAdmin() ? NamedTextColor.GOLD : NamedTextColor.LIGHT_PURPLE,
+        inv.setItem(47, item(Material.NETHER_STAR, origin.name(), NamedTextColor.GOLD,
                 "Origin Waystone", origin.worldName(), "Stay within " + formatRadius() + " blocks while charging"));
-        inv.setItem(49, item(Material.BARRIER, "Close", NamedTextColor.RED, "Close Waystone Network"));
-        inv.setItem(50, item(Material.ENDER_EYE, "Refresh", NamedTextColor.GREEN,
-                "Refresh destinations, prices and route status"));
+        inv.setItem(49, item(Material.BARRIER, "Close", NamedTextColor.RED, "Close network"));
+        inv.setItem(50, item(Material.ENDER_EYE, "Refresh", NamedTextColor.GREEN, "Refresh routes and prices"));
         if (page < pages - 1) inv.setItem(53, item(Material.ARROW, "Next", NamedTextColor.YELLOW, "Page " + (page + 2) + " / " + pages));
 
         player.openInventory(inv);
@@ -103,19 +102,20 @@ public final class NetworkGui implements Listener {
 
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || clicked.getType().isAir() || !clicked.hasItemMeta()) return;
-        String rawTarget = clicked.getItemMeta().getPersistentDataContainer().get(targetKey, PersistentDataType.STRING);
-        if (rawTarget == null) return;
+        String raw = clicked.getItemMeta().getPersistentDataContainer().get(targetKey, PersistentDataType.STRING);
+        if (raw == null) return;
 
         UUID targetId;
-        try { targetId = UUID.fromString(rawTarget); }
-        catch (IllegalArgumentException ex) {
-            plugin.feedback().action(player, "§cDestination data is invalid");
+        try {
+            targetId = UUID.fromString(raw);
+        } catch (IllegalArgumentException ex) {
+            plugin.feedback().action(player, "§cDestination unavailable");
             return;
         }
 
         WaystoneData target = plugin.registry().get(targetId);
         if (target == null || target.id().equals(origin.id()) || !isActiveDestination(player, target)) {
-            plugin.feedback().action(player, "§cThat Waystone is no longer active");
+            plugin.feedback().action(player, "§cDestination no longer active");
             open(player, origin, holder.page);
             return;
         }
@@ -131,9 +131,6 @@ public final class NetworkGui implements Listener {
         }
 
         player.closeInventory();
-        plugin.feedback().action(player, "§d" + origin.name() + " §8→ §f" + target.name()
-                + (quote.free() ? " §a• FREE" : " §7• §f" + quote.formatted()));
-        player.playSound(player.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 0.65f, 1.1f);
         plugin.teleports().start(player, target, origin);
     }
 
@@ -146,8 +143,7 @@ public final class NetworkGui implements Listener {
         List<WaystoneData> result = new ArrayList<>();
         for (WaystoneData data : plugin.registry().all()) {
             if (data.id().equals(origin.id())) continue;
-            if (!isActiveDestination(player, data)) continue;
-            result.add(data);
+            if (isActiveDestination(player, data)) result.add(data);
         }
         result.sort(Comparator
                 .comparing((WaystoneData data) -> !data.isAdmin())
@@ -157,7 +153,7 @@ public final class NetworkGui implements Listener {
     }
 
     private boolean isActiveDestination(Player player, WaystoneData data) {
-        if (data == null) return false;
+        if (data == null || !plugin.visuals().isAnchorValid(data)) return false;
         if (!coreOperational(data)) return false;
         if (!plugin.access().canAccess(player, data)) return false;
         if (!plugin.discovery().canUse(player, data)) return false;
@@ -166,16 +162,13 @@ public final class NetworkGui implements Listener {
 
     private boolean canUseOrigin(Player player, WaystoneData origin, boolean notify) {
         String error = null;
-        if (origin == null) error = "Origin Waystone is unavailable";
-        else {
-            Location location = origin.location();
-            if (location == null || location.getBlock().getType() != Material.LODESTONE) error = "Origin Waystone is unavailable";
-            else if (!coreOperational(origin)) error = "Waystone is Dormant • Core required";
-            else if (!plugin.access().canAccess(player, origin)) error = "Access denied";
-            else if (!plugin.discovery().canUse(player, origin)) error = "Activate this Waystone first";
-            else if (!origin.alwaysActive() && plugin.teleports().isSuppressed(origin)) error = "Waystone Network is suppressed";
-            else if (!nearOrigin(player, origin)) error = "Stay closer to " + origin.name();
-        }
+        if (origin == null || !plugin.visuals().isAnchorValid(origin)) error = "Origin Waystone unavailable";
+        else if (!coreOperational(origin)) error = "Dormant Waystone • Core required";
+        else if (!plugin.access().canAccess(player, origin)) error = "Access denied";
+        else if (!plugin.discovery().canUse(player, origin)) error = "Activate this Waystone first";
+        else if (!origin.alwaysActive() && plugin.teleports().isSuppressed(origin)) error = "Waystone Network suppressed";
+        else if (!nearOrigin(player, origin)) error = "Stay closer to " + origin.name();
+
         if (error != null && notify) plugin.feedback().action(player, "§c" + error);
         return error == null;
     }
@@ -196,15 +189,14 @@ public final class NetworkGui implements Listener {
         EconomyService.Quote quote = plugin.economy().quote(player, origin, target);
         boolean ready = status == TeleportService.TravelStatus.READY;
         Material material = ready ? categoryMaterial(target.category()) : Material.RED_STAINED_GLASS_PANE;
-        NamedTextColor color = ready ? (target.isAdmin() ? NamedTextColor.GOLD : NamedTextColor.LIGHT_PURPLE) : NamedTextColor.RED;
-
+        NamedTextColor color = ready ? NamedTextColor.GOLD : NamedTextColor.RED;
         String price = quote.free() ? "FREE" : quote.formatted();
+
         ItemStack stack = item(material, target.name(), color,
-                target.isAdmin() ? "Server Waystone" : "Player Waystone",
                 "Distance: " + distance(origin, target),
                 "Cost: " + price,
                 "Status: " + plugin.teleports().statusLabel(status),
-                ready ? "Click to travel" : "Route is temporarily unavailable");
+                ready ? "Click to travel" : "Route unavailable");
         ItemMeta meta = stack.getItemMeta();
         meta.getPersistentDataContainer().set(targetKey, PersistentDataType.STRING, target.id().toString());
         stack.setItemMeta(meta);
@@ -218,9 +210,9 @@ public final class NetworkGui implements Listener {
             case VILLAGE -> Material.EMERALD;
             case DUNGEON -> Material.SPAWNER;
             case KINGDOM -> Material.GOLDEN_HELMET;
-            case PLAYER -> Material.LODESTONE;
+            case PLAYER -> Material.ENDER_PEARL;
             case EVENT -> Material.FIREWORK_ROCKET;
-            case OTHER -> Material.ENDER_PEARL;
+            case OTHER -> Material.AMETHYST_SHARD;
         };
     }
 
@@ -237,8 +229,8 @@ public final class NetworkGui implements Listener {
         return radius == Math.rint(radius) ? String.valueOf((int) radius) : String.format(Locale.US, "%.1f", radius);
     }
 
-    private ItemStack filler(Material material) {
-        ItemStack stack = new ItemStack(material);
+    private ItemStack filler() {
+        ItemStack stack = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
         ItemMeta meta = stack.getItemMeta();
         meta.displayName(Component.text(" "));
         stack.setItemMeta(meta);
@@ -251,7 +243,9 @@ public final class NetworkGui implements Listener {
         meta.displayName(Component.text(label, color).decoration(TextDecoration.ITALIC, false));
         List<Component> lore = new ArrayList<>();
         for (String line : lines) {
-            if (line != null && !line.isBlank()) lore.add(Component.text(line, NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            if (line != null && !line.isBlank()) {
+                lore.add(Component.text(line, NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            }
         }
         meta.lore(lore);
         stack.setItemMeta(meta);
@@ -268,6 +262,9 @@ public final class NetworkGui implements Listener {
             this.page = page;
         }
 
-        @Override public Inventory getInventory() { return inventory; }
+        @Override
+        public Inventory getInventory() {
+            return inventory;
+        }
     }
 }
