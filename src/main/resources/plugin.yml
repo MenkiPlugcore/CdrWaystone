@@ -3,7 +3,7 @@ version: ${version}
 main: store.menkiestes.cdrwaystone.CdrWaystonePlugin
 api-version: '1.21'
 authors: [CADERA]
-description: Native Waystone system for Vephilim with ItemsAdder visual skins.
+description: Native Waystone-to-Waystone travel system for Vephilim with ItemsAdder visual skins.
 softdepend: [ItemsAdder, Vault, CdrKnockout]
 commands:
   cdrwaystone:
@@ -14,13 +14,9 @@ commands:
     description: Administrative Waystone Core command
     aliases: [cwscore, wscore]
     usage: /cwscore give <player> [amount]
-  cdrwaystonetier:
-    description: Administrative Waystone Tier command
-    aliases: [cwstier, wstier]
-    usage: /cwstier <info|set>
 permissions:
   cdrwaystone.use:
-    description: Allows using CdrWaystones and Waystone Keys
+    description: Allows using CdrWaystones and the Waystone Network
     default: true
   cdrwaystone.skin:
     description: Allows owners to change their Waystone skin
@@ -42,9 +38,6 @@ permissions:
     default: op
   cdrwaystone.core.consume.bypass:
     description: Prevents Waystone Cores from being consumed when installed
-    default: op
-  cdrwaystone.tier.cost.bypass:
-    description: Bypasses Waystone Tier upgrade resource costs
     default: op
   cdrwaystone.admin:
     description: Administrative access to CdrWaystone and Admin Waystones
