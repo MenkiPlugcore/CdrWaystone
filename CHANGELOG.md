@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.4.2 - Skin & Auto-Remove Hotfix
+
+- Kept Waystone skin management command-based so the travel GUI stays minimal.
+- `/cws skin <skin>` and `/cws admin skin <skin>` rebuild the native ItemsAdder furniture in place while preserving the Waystone node data.
+- Player command feedback remains screen-only through Action Bar; normal CdrWaystone commands do not spam player chat.
+- Added staff destroy handling for official ItemsAdder Waystone furniture.
+- Staff with `cdrwaystone.admin` can destroy a non-permanent Waystone and CdrWaystone automatically removes the furniture, invisible Barrier anchors, registry entry, and per-player discovery data.
+- Added a runtime bridge for ItemsAdder `FurnitureBreakEvent` when available, without making ItemsAdder a hard compile dependency.
+- Added a direct furniture-hit fallback so staff cleanup still works when the furniture damage event itself is protected/cancelled.
+- Breaking a managed Barrier anchor as staff now performs the same atomic Waystone removal instead of instructing staff to use a removal command.
+- Normal members still cannot destroy official Waystones, and permanent Waystones remain protected.
+
 ## 0.6.4 - Staff Furniture Waystones
 
 - Added `cdrwaystone.create`, default OP, as the only permission that converts a placed Lodestone into an official CdrWaystone.
