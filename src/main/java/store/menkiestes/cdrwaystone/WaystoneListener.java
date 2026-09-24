@@ -5,10 +5,12 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.*;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.player.*;
@@ -148,6 +150,27 @@ public final class WaystoneListener implements Listener {
             WaystoneData target = plugin.registry().get(targetId);
             if (target == null) { player.sendMessage("§cThe linked Waystone no longer exists."); return; }
             plugin.teleports().start(player, target); event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
+    public void onPvpDamage(EntityDamageByEntityEvent event) {
+        if (!plugin.getConfig().getBoolean("anti-abuse.combat.enabled", true)) return;
+        if (!(event.getEntity() instanceof Player victim)) return;
+
+        Player attacker = null;
+        if (event.getDamager() instanceof Player direct) {
+            attacker = direct;
+        } else if (event.getDamager() instanceof Projectile projectile && projectile.getShooter() instanceof Player shooter) {
+            attacker = shooter;
+        }
+        if (attacker == null || attacker.getUniqueId().equals(victim.getUniqueId())) return;
+
+        plugin.guards().tagCombat(victim);
+        plugin.guards().tagCombat(attacker);
+        if (plugin.getConfig().getBoolean("anti-abuse.combat.cancel-active-warp", true)) {
+            plugin.teleports().cancel(victim, "entered combat");
+            plugin.teleports().cancel(attacker, "entered combat");
         }
     }
 
