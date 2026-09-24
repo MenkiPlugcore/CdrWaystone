@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.6.4.4 - Laser Travel Effect
+
+- Replaced the vertical END_ROD charging column with a solid BlockDisplay laser so the Waystone reads visually like a beacon beam instead of a particle line.
+- Added a two-layer laser using a light-blue outer shell and white inner core with maximum display brightness.
+- The laser does not require a real Beacon block, pyramid, or sky access, so it works inside buildings and dungeons.
+- Added a dense player-following charging aura with two counter-rotating rings, a vertical END_ROD helix, and electric sparks.
+- Arrival now creates a short destination laser plus the existing teleport burst.
+- Charging laser entities are removed automatically on success, cancel, disconnect, plugin reload, or shutdown.
+- Added configurable laser height, outer/inner width, arrival lifetime, player aura radius, ring density, spiral density, and spark count.
+- Teleport visuals remain fail-safe: a display or particle failure cannot cancel the actual travel transaction.
+
+## 0.6.4.3 - Dense Teleport Effects
+
+- Increased charging particle density with tighter beam spacing, thicker END_ROD segments, denser rings, a portal helix, and stronger spark/burst effects.
+- Added configurable density controls with safe clamps to prevent accidental extreme particle spam.
+- Superseded by the BlockDisplay laser renderer in v0.6.4.4 while keeping configurable arrival/departure bursts.
+
 ## 0.6.4.2 - Skin & Auto-Remove Hotfix
 
 - Kept Waystone skin management command-based so the travel GUI stays minimal.
