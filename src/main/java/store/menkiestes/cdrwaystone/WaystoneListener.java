@@ -42,13 +42,18 @@ public final class WaystoneListener implements Listener {
         String skin = plugin.getConfig().getString("visuals.default-skin", "andesite");
         String name = plugin.getConfig().getString("waystones.default-name", "Waystone");
         WaystoneData data = plugin.registry().create(event.getPlayer().getUniqueId(), event.getBlockPlaced().getLocation(), name, skin);
-        plugin.discovery().setState(event.getPlayer().getUniqueId(), data.id(), DiscoveryService.State.ACTIVATED, true);
+        DiscoveryService.State ownerState = data.coreActive() ? DiscoveryService.State.ACTIVATED : DiscoveryService.State.DISCOVERED;
+        plugin.discovery().setState(event.getPlayer().getUniqueId(), data.id(), ownerState, true);
         plugin.visuals().ensureCollision(data);
         plugin.getServer().getScheduler().runTask(plugin, () -> plugin.visuals().spawn(data));
         long owned = plugin.registry().countOwned(event.getPlayer().getUniqueId());
         int limit = plugin.access().limit(event.getPlayer());
         String count = limit < 0 ? owned + "/∞" : owned + "/" + limit;
-        event.getPlayer().sendMessage("§aCdrWaystone created and activated. §7Owned: §f" + count + " §7Access: §f" + data.accessMode());
+        if (data.coreActive()) {
+            event.getPlayer().sendMessage("§aCdrWaystone created and activated. §7Owned: §f" + count + " §7Access: §f" + data.accessMode());
+        } else {
+            event.getPlayer().sendMessage("§5Dormant Waystone created. §7Install a §dWaystone Core§7 to awaken it. Owned: §f" + count);
+        }
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
@@ -102,6 +107,12 @@ public final class WaystoneListener implements Listener {
 
             plugin.discovery().discover(player, clickedWaystone, true);
 
+            if (plugin.cores().isCore(hand)) {
+                event.setCancelled(true);
+                plugin.cores().activate(player, clickedWaystone, hand);
+                return;
+            }
+
             if (hand.getType() == Material.NAME_TAG && hand.hasItemMeta() && hand.getItemMeta().hasDisplayName()) {
                 if (!plugin.access().canManage(player, clickedWaystone)) {
                     player.sendMessage("§cYou cannot rename this Waystone."); event.setCancelled(true); return;
@@ -116,6 +127,10 @@ public final class WaystoneListener implements Listener {
 
             if (plugin.keys().isKey(hand)) {
                 if (!player.hasPermission("cdrwaystone.use")) return;
+                if (!clickedWaystone.coreActive() && !(clickedWaystone.isAdmin() && plugin.getConfig().getBoolean("core.admin-bypass", true))) {
+                    player.sendMessage("§5This Waystone is Dormant. §7Install a §dWaystone Core§7 before binding a Key.");
+                    event.setCancelled(true); return;
+                }
                 if (!plugin.discovery().canUse(player, clickedWaystone)) {
                     player.sendMessage("§dThis Waystone must be activated first. §7Right-click it normally and use the Activate button.");
                     event.setCancelled(true); return;
@@ -136,7 +151,11 @@ public final class WaystoneListener implements Listener {
             if (event.getAction() == Action.RIGHT_CLICK_BLOCK && plugin.getConfig().getBoolean("gui.enabled", true)) {
                 event.setCancelled(true);
                 if (player.isSneaking() && hand.getType().isAir() && plugin.getConfig().getBoolean("network.enabled", true)) {
-                    plugin.networkGui().open(player, clickedWaystone);
+                    if (!clickedWaystone.coreActive() && !(clickedWaystone.isAdmin() && plugin.getConfig().getBoolean("core.admin-bypass", true))) {
+                        player.sendMessage("§5This Waystone is Dormant. §7Install a §dWaystone Core§7 before opening its Network.");
+                    } else {
+                        plugin.networkGui().open(player, clickedWaystone);
+                    }
                 } else {
                     plugin.gui().openMain(player, clickedWaystone);
                 }
