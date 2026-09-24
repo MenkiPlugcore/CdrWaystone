@@ -1,4 +1,4 @@
-# CdrWaystone v0.6.4.3
+# CdrWaystone v0.6.4.4
 # Paper 1.21.11 + Java 21
 
 waystones:
@@ -104,22 +104,26 @@ warp:
   allow-cross-world: true
   safe-radius: 3
 
-# Dense beacon-like Waystone charging visuals.
+# v0.6.4.4: solid laser display + rotating particle aura around the travelling player.
 teleport-effects:
   enabled: true
-  beam-height: 5.0
-  ring-radius: 1.15
+  # Height of the laser column in blocks. Clamped to 2-32.
+  beam-height: 7.0
+  laser:
+    enabled: true
+    # Outer cyan shell and inner white core create a beacon-like laser.
+    outer-width: 0.24
+    inner-width: 0.085
+    # Destination laser lifetime after arrival.
+    arrival-duration-ticks: 24
+  aura:
+    # Thick rotating rings and helix follow the player during warmup.
+    radius: 0.90
+    ring-points: 22
+    spiral-points: 14
+    spark-count: 5
   density:
-    # Higher ring-points = denser circular aura. Safe range is clamped to 8-40.
-    ring-points: 20
-    # Smaller step = denser vertical beam. Safe range is clamped to 0.20-0.80.
-    beam-step: 0.32
-    # Number of END_ROD particles per beam segment. Safe range is 1-6.
-    beam-thickness: 3
-    # Portal helix points around the beam. Set 0 to disable.
-    spiral-points: 10
-    spark-count: 6
-    # 1-3. Default 2 gives a noticeably heavier depart/arrival burst.
+    # 1-3. Controls depart/arrival particle burst only.
     burst-multiplier: 2
 
 power:
