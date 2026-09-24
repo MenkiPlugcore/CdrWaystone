@@ -48,11 +48,11 @@ public final class CoreService {
     public boolean activate(Player player, WaystoneData data, ItemStack held) {
         if (player == null || data == null || !isCore(held)) return false;
         if (data.coreActive()) {
-            player.sendMessage("§7This Waystone Core is already active.");
+            plugin.feedback().action(player, "§7Waystone Core already active");
             return false;
         }
         if (!plugin.access().canManage(player, data)) {
-            player.sendMessage("§cOnly the Waystone owner or an administrator can install its Core.");
+            plugin.feedback().action(player, "§cOnly the owner can install this Core");
             return false;
         }
 
@@ -72,10 +72,7 @@ public final class CoreService {
             center.getWorld().playSound(center, Sound.BLOCK_BEACON_ACTIVATE, 1.0f, 0.9f);
             center.getWorld().playSound(center, Sound.BLOCK_RESPAWN_ANCHOR_SET_SPAWN, 0.8f, 1.25f);
         }
-        player.showTitle(net.kyori.adventure.title.Title.title(
-                Component.text("WAYSTONE AWAKENED", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD),
-                Component.text(data.name(), NamedTextColor.WHITE)));
-        player.sendMessage("§d✦ §f" + data.name() + " §dhas awakened. Network travel is now available.");
+        plugin.feedback().title(player, "§d§lWAYSTONE AWAKENED", "§f" + data.name(), 200, 1400, 400);
         return true;
     }
 
