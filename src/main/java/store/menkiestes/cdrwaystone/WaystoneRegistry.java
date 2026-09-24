@@ -7,20 +7,25 @@ import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 
 public final class WaystoneRegistry {
     private final CdrWaystonePlugin plugin;
     private final File file;
+    private final File backupFile;
     private final Map<UUID, WaystoneData> byId = new LinkedHashMap<>();
     private final Map<String, UUID> byLocation = new HashMap<>();
 
     public WaystoneRegistry(CdrWaystonePlugin plugin) {
         this.plugin = plugin;
         this.file = new File(plugin.getDataFolder(), "waystones.yml");
+        this.backupFile = new File(plugin.getDataFolder(), "waystones.yml.bak");
     }
 
-    public void load() {
+    public synchronized void load() {
         byId.clear();
         byLocation.clear();
         if (!file.exists()) return;
@@ -33,15 +38,19 @@ public final class WaystoneRegistry {
             try {
                 UUID id = UUID.fromString(rawId);
                 String path = "waystones." + rawId;
-                UUID owner = UUID.fromString(yaml.getString(path + ".owner"));
-                UUID worldId = UUID.fromString(yaml.getString(path + ".world-id"));
+                UUID owner = UUID.fromString(Objects.requireNonNull(yaml.getString(path + ".owner")));
+                UUID worldId = UUID.fromString(Objects.requireNonNull(yaml.getString(path + ".world-id")));
                 String worldName = yaml.getString(path + ".world-name", "world");
                 int x = yaml.getInt(path + ".x");
                 int y = yaml.getInt(path + ".y");
                 int z = yaml.getInt(path + ".z");
                 String name = yaml.getString(path + ".name", "Waystone");
                 String skin = yaml.getString(path + ".skin", "andesite");
-                WaystoneData data = new WaystoneData(id, owner, worldId, worldName, x, y, z, name, skin);
+                // v0.1.0 always owned the generated Barrier when one existed.
+                boolean collisionOwned = yaml.contains(path + ".collision-owned")
+                        ? yaml.getBoolean(path + ".collision-owned")
+                        : true;
+                WaystoneData data = new WaystoneData(id, owner, worldId, worldName, x, y, z, name, skin, collisionOwned);
                 byId.put(id, data);
                 byLocation.put(locationKey(worldId, x, y, z), id);
             } catch (Exception ex) {
@@ -62,18 +71,33 @@ public final class WaystoneRegistry {
             yaml.set(path + ".z", data.z());
             yaml.set(path + ".name", data.name());
             yaml.set(path + ".skin", data.skin());
+            yaml.set(path + ".collision-owned", data.collisionOwned());
         }
+
+        File tempFile = new File(plugin.getDataFolder(), "waystones.yml.tmp");
         try {
-            yaml.save(file);
+            if (!plugin.getDataFolder().exists() && !plugin.getDataFolder().mkdirs()) {
+                throw new IOException("Could not create plugin data folder");
+            }
+            yaml.save(tempFile);
+            if (file.exists()) {
+                Files.copy(file.toPath(), backupFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            }
+            try {
+                Files.move(tempFile.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException ignored) {
+                Files.move(tempFile.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            }
         } catch (IOException ex) {
-            plugin.getLogger().severe("Could not save waystones.yml: " + ex.getMessage());
+            plugin.getLogger().severe("Could not save waystones.yml safely: " + ex.getMessage());
+            if (tempFile.exists() && !tempFile.delete()) tempFile.deleteOnExit();
         }
     }
 
-    public WaystoneData create(UUID owner, Location location, String name, String skin) {
+    public synchronized WaystoneData create(UUID owner, Location location, String name, String skin) {
         UUID id = UUID.randomUUID();
         WaystoneData data = new WaystoneData(id, owner, location.getWorld().getUID(), location.getWorld().getName(),
-                location.getBlockX(), location.getBlockY(), location.getBlockZ(), name, skin);
+                location.getBlockX(), location.getBlockY(), location.getBlockZ(), name, skin, false);
         byId.put(id, data);
         byLocation.put(locationKey(location), id);
         save();
@@ -86,12 +110,16 @@ public final class WaystoneRegistry {
     }
 
     public WaystoneData get(UUID id) { return byId.get(id); }
-    public Collection<WaystoneData> all() { return Collections.unmodifiableCollection(byId.values()); }
+    public Collection<WaystoneData> all() { return Collections.unmodifiableCollection(new ArrayList<>(byId.values())); }
 
-    public void remove(WaystoneData data) {
+    public synchronized void remove(WaystoneData data) {
+        remove(data, true);
+    }
+
+    public synchronized void remove(WaystoneData data, boolean saveNow) {
         byId.remove(data.id());
         byLocation.remove(locationKey(data.worldId(), data.x(), data.y(), data.z()));
-        save();
+        if (saveNow) save();
     }
 
     public List<WaystoneData> inChunk(World world, int chunkX, int chunkZ) {
