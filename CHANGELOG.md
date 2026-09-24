@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.6.0 - Waystone Core & Activation Progression
+
+- Added persistent Waystone Core states: `DORMANT` and `ACTIVE`.
+- New Player Waystones now default to `DORMANT` and cannot be used for Key binding, Network Travel, or destination travel until awakened.
+- Existing Waystones from pre-v0.6.0 installations migrate safely as `ACTIVE` so upgrades do not disable established travel infrastructure.
+- Added the PDC-authenticated `Waystone Core` item using Echo Shard as its default visual material.
+- Added a configurable Waystone Core recipe using Amethyst Shards, Ender Pearls, and a Heart of the Sea by default.
+- Right-clicking a Dormant Waystone with a valid Waystone Core awakens it, consumes one Core, saves the new state, and automatically attunes the installer.
+- Creative/admin Core consumption bypass is available through `cdrwaystone.core.consume.bypass`.
+- Added awakening particles, sounds, title feedback, and chat confirmation.
+- Added Core-state checks to discovery activation, Key binding, Network opening, and teleport route validation.
+- Added `DORMANT` as a first-class route status with dedicated player feedback.
+- Premium Waystone GUI now shows Core state, Dormant status, Core requirement help, and prevents misleading Online/Activated messaging before awakening.
+- Admin Waystones default to `ACTIVE`; optional `core.admin-bypass` can keep server infrastructure operational regardless of stored Core state.
+- Added `/cwscore give <player> [amount]` for administrator QA and event distribution.
+- Added configurable Core item material and recipe ingredients.
+- Existing economy, cooldown, combat lock, CdrKnockout integration, ownership, discovery, category, power, suppression, and stability systems remain enforced.
+
 ## 0.5.1 - Cooldown & Anti-Abuse
 
 - Added configurable post-teleport travel cooldown, starting only after a successful teleport.
