@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0 - Waystone GUI System
+
+- Added a premium 6-row Waystone management GUI opened by right-clicking a Waystone without a Key/Name Tag.
+- Added visual frame styling, Waystone preview, owner head, active/suppressed status, power state, coordinates and travel rules.
+- Added an interactive 19-skin gallery with themed material icons.
+- Owners/admins can apply skins directly from the GUI; visuals refresh immediately and persist.
+- Added rename guidance and Waystone Key usage help inside the UI.
+- Added player/admin presentation state and a placeholder for the upcoming Admin Waystone system.
+- Added GUI input protection against item movement/drag exploits.
+- Added `gui.enabled` configuration toggle.
+
 ## 0.1.1 - Stability Patch
 
 - Added per-Waystone visual UUID markers so nearby Waystones cannot delete each other's `ItemDisplay` model.
