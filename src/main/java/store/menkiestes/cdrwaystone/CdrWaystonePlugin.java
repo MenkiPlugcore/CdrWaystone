@@ -55,6 +55,10 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new WaystoneListener(this), this);
         getServer().getPluginManager().registerEvents(networkGui, this);
 
+        FurnitureBreakBridge furnitureBreakBridge = new FurnitureBreakBridge(this);
+        getServer().getPluginManager().registerEvents(furnitureBreakBridge, this);
+        furnitureBreakBridge.registerItemsAdderEvent();
+
         CdrWaystoneCommand commandHandler = new CdrWaystoneCommand(this);
         PluginCommand command = getCommand("cdrwaystone");
         if (command != null) {
