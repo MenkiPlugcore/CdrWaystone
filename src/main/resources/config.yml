@@ -1,0 +1,48 @@
+# CdrWaystone v0.1.0
+# Paper 1.21.11 + Java 21
+
+waystones:
+  auto-register-lodestones: true
+  default-name: "Waystone"
+
+warp:
+  delay-seconds: 5
+  damage-cancels: true
+  movement-cancels: false
+  allow-cross-world: true
+  safe-radius: 3
+
+power:
+  # NONE, INTER_DIMENSION, ALL
+  require: INTER_DIMENSION
+  respawn-anchor-cost: 1
+
+suppression:
+  enabled: true
+  block: OBSIDIAN
+
+collision:
+  # The Lodestone is the lower collision block. A Barrier one block above
+  # gives the two-block-tall visual a real collision body.
+  enabled: true
+
+portal-sickness:
+  enabled: true
+  chance: 0.05
+  nausea-seconds: 15
+  blindness-seconds: 3
+  damage: 5.0
+
+visuals:
+  enabled: true
+  default-skin: andesite
+  # Applied to the ItemDisplay spawn point.
+  y-offset: 0.0
+  rotation-degrees: 0.0
+  view-range: 1.5
+
+key:
+  material: COMPASS
+  name: "<light_purple>Waystone Key</light_purple>"
+  relinkable: true
+  recipe-enabled: true
