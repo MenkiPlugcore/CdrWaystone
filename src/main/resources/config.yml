@@ -1,4 +1,4 @@
-# CdrWaystone v0.1.0
+# CdrWaystone v0.1.1
 # Paper 1.21.11 + Java 21
 
 waystones:
@@ -22,9 +22,20 @@ suppression:
   block: OBSIDIAN
 
 collision:
-  # The Lodestone is the lower collision block. A Barrier one block above
-  # gives the two-block-tall visual a real collision body.
+  # The Lodestone is the lower collision block. A plugin-owned Barrier one
+  # block above gives the two-block-tall model a real collision body.
   enabled: true
+
+protection:
+  # Prevent explosions from desynchronizing registered Waystones.
+  explosions: true
+  # Prevent pistons from moving registered Waystones/collision blocks.
+  pistons: true
+
+stability:
+  # Self-healing pass for /setblock, external plugins, crash leftovers, etc.
+  # Minimum accepted value is 30 seconds.
+  health-check-seconds: 300
 
 portal-sickness:
   enabled: true
