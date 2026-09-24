@@ -24,11 +24,12 @@ public final class WaystoneData {
     private boolean freeTravel;
     private boolean permanent;
     private boolean alwaysActive;
+    private boolean globallyDiscovered;
 
     public WaystoneData(UUID id, UUID owner, UUID worldId, String worldName,
                         int x, int y, int z, String name, String skin, boolean collisionOwned,
                         Type type, boolean publicAccess, boolean freeTravel,
-                        boolean permanent, boolean alwaysActive) {
+                        boolean permanent, boolean alwaysActive, boolean globallyDiscovered) {
         this.id = id;
         this.owner = owner;
         this.worldId = worldId;
@@ -44,6 +45,7 @@ public final class WaystoneData {
         this.freeTravel = freeTravel;
         this.permanent = permanent;
         this.alwaysActive = alwaysActive;
+        this.globallyDiscovered = globallyDiscovered;
     }
 
     public UUID id() { return id; }
@@ -62,6 +64,7 @@ public final class WaystoneData {
     public boolean freeTravel() { return freeTravel; }
     public boolean permanent() { return permanent; }
     public boolean alwaysActive() { return alwaysActive; }
+    public boolean globallyDiscovered() { return globallyDiscovered; }
 
     public void owner(UUID value) { this.owner = value; }
     public void name(String value) { this.name = value; }
@@ -72,6 +75,7 @@ public final class WaystoneData {
     public void freeTravel(boolean value) { this.freeTravel = value; }
     public void permanent(boolean value) { this.permanent = value; }
     public void alwaysActive(boolean value) { this.alwaysActive = value; }
+    public void globallyDiscovered(boolean value) { this.globallyDiscovered = value; }
 
     public World world() {
         World world = Bukkit.getWorld(worldId);
