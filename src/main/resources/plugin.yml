@@ -14,6 +14,10 @@ commands:
     description: Administrative Waystone Core command
     aliases: [cwscore, wscore]
     usage: /cwscore give <player> [amount]
+  cdrwaystonetier:
+    description: Administrative Waystone Tier command
+    aliases: [cwstier, wstier]
+    usage: /cwstier <info|set>
 permissions:
   cdrwaystone.use:
     description: Allows using CdrWaystones and Waystone Keys
@@ -38,6 +42,9 @@ permissions:
     default: op
   cdrwaystone.core.consume.bypass:
     description: Prevents Waystone Cores from being consumed when installed
+    default: op
+  cdrwaystone.tier.cost.bypass:
+    description: Bypasses Waystone Tier upgrade resource costs
     default: op
   cdrwaystone.admin:
     description: Administrative access to CdrWaystone and Admin Waystones
