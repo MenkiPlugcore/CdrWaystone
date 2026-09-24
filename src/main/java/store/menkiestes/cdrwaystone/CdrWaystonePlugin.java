@@ -59,6 +59,12 @@ public final class CdrWaystonePlugin extends JavaPlugin {
             command.setExecutor(commandHandler);
             command.setTabCompleter(commandHandler);
         }
+        CoreCommand coreHandler = new CoreCommand(this);
+        PluginCommand coreCommand = getCommand("cdrwaystonecore");
+        if (coreCommand != null) {
+            coreCommand.setExecutor(coreHandler);
+            coreCommand.setTabCompleter(coreHandler);
+        }
 
         registerKeyRecipe();
         cores.registerRecipe();
