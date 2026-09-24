@@ -76,14 +76,15 @@ public final class NetworkGui implements Listener {
                 "Only ACTIVATED Waystones are listed",
                 "Access rules are respected",
                 "Top row filters by category",
-                "Travel uses the normal warp countdown"));
+                "Economy: " + plugin.economy().providerLabel(),
+                "Cost is charged when countdown completes"));
         inv.setItem(48, item(Material.BARRIER, "Close", NamedTextColor.RED, "Close the Waystone Network"));
         inv.setItem(49, item(origin.isAdmin() ? Material.NETHER_STAR : Material.LODESTONE,
                 "Origin: " + origin.name(), origin.isAdmin() ? NamedTextColor.GOLD : NamedTextColor.LIGHT_PURPLE,
                 "Category: " + origin.category(), origin.worldName(), "Visible destinations: " + destinations.size(),
                 "Stay within " + formatRadius() + " blocks of this Waystone"));
         inv.setItem(50, item(Material.ENDER_EYE, "Refresh Network", NamedTextColor.GREEN,
-                "Refresh access, activation and route status", "Current filter: " + (filter == null ? "ALL" : filter.name())));
+                "Refresh access, price and route status", "Current filter: " + (filter == null ? "ALL" : filter.name())));
         if (page < pages - 1) inv.setItem(53, item(Material.ARROW, "Next Page", NamedTextColor.YELLOW, "Page " + (page + 2) + " of " + pages));
 
         player.openInventory(inv);
@@ -135,17 +136,23 @@ public final class NetworkGui implements Listener {
             open(player, origin, holder.page, holder.filter); return;
         }
 
-        TeleportService.TravelStatus status = plugin.teleports().travelStatus(player, target);
+        TeleportService.TravelStatus status = plugin.teleports().travelStatus(player, target, origin);
         if (status != TeleportService.TravelStatus.READY) {
             player.sendMessage("§cRoute unavailable: §f" + plugin.teleports().statusLabel(status));
+            EconomyService.Quote quote = plugin.economy().quote(player, origin, target);
+            if (status == TeleportService.TravelStatus.INSUFFICIENT_FUNDS) {
+                player.sendMessage("§7Required travel cost: §f" + quote.formatted());
+            }
             player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.6f, 0.8f);
             open(player, origin, holder.page, holder.filter); return;
         }
 
+        EconomyService.Quote quote = plugin.economy().quote(player, origin, target);
         player.closeInventory();
         player.sendMessage("§5Routing Waystone Network: §f" + origin.name() + " §8→ §f" + target.name());
+        if (!quote.free()) player.sendMessage("§7Travel cost: §f" + quote.formatted());
         player.playSound(player.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 0.7f, 1.15f);
-        plugin.teleports().start(player, target);
+        plugin.teleports().start(player, target, origin);
     }
 
     @EventHandler
@@ -189,7 +196,8 @@ public final class NetworkGui implements Listener {
     }
 
     private ItemStack destinationItem(Player player, WaystoneData origin, WaystoneData target) {
-        TeleportService.TravelStatus status = plugin.teleports().travelStatus(player, target);
+        TeleportService.TravelStatus status = plugin.teleports().travelStatus(player, target, origin);
+        EconomyService.Quote quote = plugin.economy().quote(player, origin, target);
         boolean ready = status == TeleportService.TravelStatus.READY;
         Material material = ready ? categoryMaterial(target.category()) : Material.RED_STAINED_GLASS_PANE;
         NamedTextColor color = ready ? categoryColor(target.category(), target.isAdmin()) : NamedTextColor.RED;
@@ -199,6 +207,7 @@ public final class NetworkGui implements Listener {
                 "World: " + target.worldName(),
                 "Distance: " + distance(origin, target),
                 "Skin: " + pretty(target.skin()),
+                "Travel Cost: " + quote.formatted(),
                 "Route: " + plugin.teleports().statusLabel(status),
                 ready ? "Click to begin network travel" : "Route cannot be used right now");
         ItemMeta meta = stack.getItemMeta();
