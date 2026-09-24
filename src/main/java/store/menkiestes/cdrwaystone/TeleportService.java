@@ -70,6 +70,12 @@ public final class TeleportService {
         if (target.isAdmin() && !target.publicAccess() && !player.hasPermission("cdrwaystone.admin")) {
             player.sendMessage("§cThat Admin Waystone is not public."); return false;
         }
+        if (!plugin.discovery().canUse(player, target)) {
+            DiscoveryService.State state = plugin.discovery().status(player, target);
+            if (state == DiscoveryService.State.UNKNOWN) player.sendMessage("§7You have not discovered that Waystone yet.");
+            else player.sendMessage("§dYou discovered that Waystone, but it has not been activated yet.");
+            return false;
+        }
         if (!target.alwaysActive() && isSuppressed(target)) { player.sendMessage("§cThat Waystone is suppressed."); return false; }
         boolean crossWorld = !player.getWorld().getUID().equals(target.worldId());
         if (crossWorld && !plugin.getConfig().getBoolean("warp.allow-cross-world", true)) {
