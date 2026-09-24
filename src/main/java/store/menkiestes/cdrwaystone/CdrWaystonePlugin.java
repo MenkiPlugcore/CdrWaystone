@@ -24,6 +24,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        mergeConfigDefaults();
         saveResourceIfMissing("skins.yml");
 
         loadSkins();
@@ -53,6 +54,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         if (maintenance != null) maintenance.stop();
+        if (teleports != null) teleports.cancelAll();
         if (registry != null) registry.save();
         // ItemDisplays are runtime-only. Remove only visuals on plugin unload;
         // collision Barriers remain managed so a hot reload cannot expose/alter
@@ -62,10 +64,16 @@ public final class CdrWaystonePlugin extends JavaPlugin {
 
     public void reloadPlugin() {
         reloadConfig();
+        mergeConfigDefaults();
         loadSkins();
         registerKeyRecipe();
         visuals.refreshAllLoaded();
         if (maintenance != null) maintenance.start();
+    }
+
+    private void mergeConfigDefaults() {
+        getConfig().options().copyDefaults(true);
+        saveConfig();
     }
 
     private void loadSkins() {
