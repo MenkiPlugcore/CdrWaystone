@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.1 - Cooldown & Anti-Abuse
+
+- Added configurable post-teleport travel cooldown, starting only after a successful teleport.
+- Added PvP combat tagging for both attacker and victim.
+- Projectile attacks from players now trigger combat tagging as well as melee attacks.
+- Added configurable combat-tag duration and immediate active-warp cancellation when combat starts.
+- Combat state is timestamp-based, so relogging during the same server session does not instantly clear the tag.
+- Added travel guard revalidation when a warp begins, during warmup, and immediately before teleport commit.
+- Added `COOLDOWN`, `COMBAT_LOCKED`, and `KNOCKED_OUT` route states to the existing travel validation engine.
+- Added optional runtime integration with the public CdrKnockout Bukkit service API.
+- Knocked players and players with death-in-progress can be blocked from Waystone travel without a hard dependency on CdrKnockout.
+- Added `cdrwaystone.cooldown.bypass`, `cdrwaystone.combat.bypass`, and `cdrwaystone.knockout.bypass` permissions, default OP.
+- Added `CdrKnockout` as an optional soft dependency for correct service load ordering.
+- Existing economy, access, discovery, suppression, dimensional power, safe-arrival, refund, and Portal Sickness rules remain enforced.
+
 ## 0.5.0 - Travel Cost & Economy Engine
 
 - Added configurable travel pricing for Waystone Network and Waystone Key teleports.
