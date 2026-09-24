@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "store.menkiestes"
-version = "0.6.4.1"
+version = "0.6.4.2"
 
 repositories {
     mavenCentral()
