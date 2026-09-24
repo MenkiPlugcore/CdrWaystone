@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.5.0 - Travel Cost & Economy Engine
+
+- Added configurable travel pricing for Waystone Network and Waystone Key teleports.
+- Added economy providers: `AUTO`, `VAULT`, `XP_LEVELS`, `ITEM`, and `NONE`.
+- `AUTO` uses Vault when an economy provider is registered and falls back to XP Levels when Vault is unavailable.
+- Vault integration is runtime-only and optional; CdrWaystone does not hard-depend on a specific Vault API build.
+- Added configurable base cost, free-distance threshold, cost per 1000 blocks, cross-world flat cost, minimum/maximum cost, and rounding mode.
+- Added per-destination-category price multipliers for CAPITAL, CITY, VILLAGE, DUNGEON, KINGDOM, PLAYER, EVENT, and OTHER.
+- Added XP conversion value so monetary cost units can map cleanly to experience levels.
+- Added ITEM economy with configurable material, display name, and value-per-item.
+- Admin Waystones with `Free Travel = true` bypass travel cost automatically.
+- Added `cdrwaystone.cost.bypass`, default OP, for staff/rank travel-cost bypass.
+- Network destination cards now display live travel cost and insufficient-funds route status.
+- Network pricing is calculated from the origin Waystone to the destination.
+- Waystone Key pricing is calculated from the player's position when the warp begins.
+- Travel cost is locked when countdown starts, affordability is checked again when countdown completes, and payment is charged immediately before teleport.
+- Failed Bukkit teleports automatically refund the travel payment and do not consume Respawn Anchor power.
+- Existing access, discovery, suppression, dimensional power, countdown, damage cancellation, safe-arrival, and Portal Sickness rules remain enforced.
+- Added optional Vault soft-load ordering while preserving startup without Vault.
+
+## 0.4.1 - Waystone Categories & Network Filters
+
+- Added persistent Waystone categories: `CAPITAL`, `CITY`, `VILLAGE`, `DUNGEON`, `KINGDOM`, `PLAYER`, `EVENT`, and `OTHER`.
+- Existing Player Waystones migrate to `PLAYER`; existing Admin Waystones migrate to `CITY` when no category was previously stored.
+- Added configurable default categories for new Player and Admin Waystones.
+- Added `/cws category <category>` for Player Waystone owners.
+- Added `/cws admin category <category>` for Admin Waystones.
+- `/cws info` now includes category metadata.
+- Added category-specific icons and colors to Network destination cards.
+- Added a top-row Network filter bar for ALL and all eight categories.
+- Category filters preserve pagination and live route validation.
+- Categories are organization metadata only and do not bypass access, discovery, power, or teleport restrictions.
+
 ## 0.4.0 - Waystone Network Travel
 
 - Added a premium paginated Waystone Network GUI with up to 28 destinations per page.
