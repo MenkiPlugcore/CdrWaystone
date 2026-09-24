@@ -48,6 +48,8 @@ public final class EconomyService {
 
         boolean providerAvailable = provider != Provider.VAULT || ensureVault();
         double raw = calculateRawCost(player, origin, target);
+        WaystoneData routeNode = origin == null ? target : origin;
+        raw *= plugin.tiers().costMultiplier(routeNode);
         if (raw <= 0.0) return new Quote(0.0, 0.0, provider, "FREE", true, providerAvailable);
 
         double charge = normalizeCharge(raw, provider);
