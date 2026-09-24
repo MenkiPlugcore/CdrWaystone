@@ -13,6 +13,7 @@ public final class WaystoneData {
     public enum Type { PLAYER, ADMIN }
     public enum AccessMode { PRIVATE, TRUSTED, PUBLIC }
     public enum Category { CAPITAL, CITY, VILLAGE, DUNGEON, KINGDOM, PLAYER, EVENT, OTHER }
+    public enum CoreState { DORMANT, ACTIVE }
 
     private final UUID id;
     private UUID owner;
@@ -32,13 +33,15 @@ public final class WaystoneData {
     private boolean globallyDiscovered;
     private AccessMode accessMode;
     private Category category;
+    private CoreState coreState;
     private final Set<UUID> trustedPlayers;
 
     public WaystoneData(UUID id, UUID owner, UUID worldId, String worldName,
                         int x, int y, int z, String name, String skin, boolean collisionOwned,
                         Type type, boolean publicAccess, boolean freeTravel,
                         boolean permanent, boolean alwaysActive, boolean globallyDiscovered,
-                        AccessMode accessMode, Set<UUID> trustedPlayers, Category category) {
+                        AccessMode accessMode, Set<UUID> trustedPlayers, Category category,
+                        CoreState coreState) {
         this.id = id;
         this.owner = owner;
         this.worldId = worldId;
@@ -58,6 +61,7 @@ public final class WaystoneData {
         this.accessMode = accessMode == null ? AccessMode.PRIVATE : accessMode;
         this.trustedPlayers = new LinkedHashSet<>(trustedPlayers == null ? Set.of() : trustedPlayers);
         this.category = category == null ? (type == Type.ADMIN ? Category.CITY : Category.PLAYER) : category;
+        this.coreState = coreState == null ? CoreState.ACTIVE : coreState;
     }
 
     public UUID id() { return id; }
@@ -79,6 +83,8 @@ public final class WaystoneData {
     public boolean globallyDiscovered() { return globallyDiscovered; }
     public AccessMode accessMode() { return accessMode; }
     public Category category() { return category; }
+    public CoreState coreState() { return coreState; }
+    public boolean coreActive() { return coreState == CoreState.ACTIVE; }
     public Set<UUID> trustedPlayers() { return Collections.unmodifiableSet(trustedPlayers); }
     public boolean isTrusted(UUID playerId) { return playerId != null && trustedPlayers.contains(playerId); }
 
@@ -94,6 +100,7 @@ public final class WaystoneData {
     public void globallyDiscovered(boolean value) { this.globallyDiscovered = value; }
     public void accessMode(AccessMode value) { this.accessMode = value == null ? AccessMode.PRIVATE : value; }
     public void category(Category value) { this.category = value == null ? (isAdmin() ? Category.CITY : Category.PLAYER) : value; }
+    public void coreState(CoreState value) { this.coreState = value == null ? CoreState.DORMANT : value; }
     public boolean trust(UUID playerId) { return playerId != null && trustedPlayers.add(playerId); }
     public boolean untrust(UUID playerId) { return playerId != null && trustedPlayers.remove(playerId); }
     public void clearTrusted() { trustedPlayers.clear(); }
