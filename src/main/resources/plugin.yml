@@ -3,7 +3,7 @@ version: ${version}
 main: store.menkiestes.cdrwaystone.CdrWaystonePlugin
 api-version: '1.21'
 authors: [CADERA]
-description: Native Waystone-to-Waystone travel system for Vephilim with ItemsAdder visual skins.
+description: Native paid Waystone-to-Waystone travel system for Vephilim using ItemsAdder furniture.
 softdepend: [ItemsAdder, Vault, CdrKnockout]
 commands:
   cdrwaystone:
@@ -18,6 +18,9 @@ permissions:
   cdrwaystone.use:
     description: Allows using CdrWaystones and the Waystone Network
     default: true
+  cdrwaystone.create:
+    description: Converts placed Lodestones into official CdrWaystones
+    default: op
   cdrwaystone.skin:
     description: Allows owners to change their Waystone skin
     default: true
