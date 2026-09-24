@@ -1,0 +1,22 @@
+name: CdrWaystone
+version: ${version}
+main: store.menkiestes.cdrwaystone.CdrWaystonePlugin
+api-version: '1.21'
+authors: [CADERA]
+description: Native Waystone system for Vephilim with ItemsAdder visual skins.
+softdepend: [ItemsAdder]
+commands:
+  cdrwaystone:
+    description: Main CdrWaystone command
+    aliases: [cws, cdrws]
+    usage: /cws <getkey|skin|skins|refresh|reload|info|remove>
+permissions:
+  cdrwaystone.use:
+    description: Allows using CdrWaystones and Waystone Keys
+    default: true
+  cdrwaystone.skin:
+    description: Allows owners to change their Waystone skin
+    default: true
+  cdrwaystone.admin:
+    description: Administrative access to CdrWaystone
+    default: op
