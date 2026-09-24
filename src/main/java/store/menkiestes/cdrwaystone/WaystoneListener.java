@@ -30,7 +30,7 @@ public final class WaystoneListener implements Listener {
     }
 
     /**
-     * v0.6.4 placement rule:
+     * Staff placement rule:
      * - cdrwaystone.create => Lodestone is consumed as the placement trigger for an official Waystone.
      * - everyone else => completely normal vanilla Lodestone, never registered by CdrWaystone.
      */
@@ -85,39 +85,53 @@ public final class WaystoneListener implements Listener {
         WaystoneData data = waystoneFromClickedBlock(block);
         if (data == null) return;
 
+        Player player = event.getPlayer();
+
+        // Official Waystones use invisible Barrier anchors. Never let Bukkit
+        // break only one anchor and leave a ghost node. Staff destruction is
+        // converted into one atomic Waystone removal instead.
         if (block.getType() == Material.BARRIER) {
             event.setCancelled(true);
-            if (data.isAdmin() && !event.getPlayer().hasPermission("cdrwaystone.admin")) {
-                plugin.feedback().action(event.getPlayer(), "§cServer Waystone cannot be broken");
-            } else if (data.permanent()) {
-                plugin.feedback().action(event.getPlayer(), "§6Permanent Waystone");
-            } else {
-                plugin.feedback().action(event.getPlayer(), "§7Use §f/cws admin remove §7to remove this Waystone");
+            if (!player.hasPermission("cdrwaystone.admin")) {
+                plugin.feedback().action(player, "§cOfficial Waystone is protected");
+                return;
             }
+            if (data.permanent()) {
+                plugin.feedback().action(player, "§6Permanent Waystone");
+                return;
+            }
+            removeWaystone(data, player);
             return;
         }
 
         if (data.isAdmin()) {
-            if (!event.getPlayer().hasPermission("cdrwaystone.admin")) {
+            if (!player.hasPermission("cdrwaystone.admin")) {
                 event.setCancelled(true);
-                plugin.feedback().action(event.getPlayer(), "§cServer Waystone cannot be broken");
+                plugin.feedback().action(player, "§cServer Waystone cannot be broken");
                 return;
             }
             if (data.permanent()) {
                 event.setCancelled(true);
-                plugin.feedback().action(event.getPlayer(), "§6Permanent Waystone");
+                plugin.feedback().action(player, "§6Permanent Waystone");
                 return;
             }
-        } else if (!plugin.access().canManage(event.getPlayer(), data)) {
+        } else if (!plugin.access().canManage(player, data)) {
             event.setCancelled(true);
-            plugin.feedback().action(event.getPlayer(), "§cOnly the owner can break this Waystone");
+            plugin.feedback().action(player, "§cOnly the owner can break this Waystone");
             return;
         }
 
+        // Legacy visible registered blocks are also removed atomically.
+        event.setCancelled(true);
+        removeWaystone(data, player);
+    }
+
+    private void removeWaystone(WaystoneData data, Player player) {
+        if (plugin.registry().get(data.id()) == null) return;
         plugin.visuals().remove(data);
         plugin.registry().remove(data);
         plugin.discovery().forgetWaystone(data.id());
-        plugin.feedback().action(event.getPlayer(), "§eWaystone removed");
+        plugin.feedback().action(player, "§eWaystone removed");
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
