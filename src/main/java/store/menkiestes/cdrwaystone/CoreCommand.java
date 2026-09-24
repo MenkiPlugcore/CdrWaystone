@@ -22,20 +22,20 @@ public final class CoreCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("cdrwaystone.admin")) {
-            sender.sendMessage("§cNo permission.");
+            plugin.feedback().command(sender, "§cNo permission");
             return true;
         }
         if (args.length == 0 || !args[0].equalsIgnoreCase("give")) {
-            sender.sendMessage("§dWaystone Core: §f/cwscore give <player> [amount]");
+            plugin.feedback().command(sender, "§d/cwscore give <player> [amount]");
             return true;
         }
         if (args.length < 2) {
-            sender.sendMessage("§cUsage: /cwscore give <player> [amount]");
+            plugin.feedback().command(sender, "§cUsage: /cwscore give <player> [amount]");
             return true;
         }
         Player target = Bukkit.getPlayerExact(args[1]);
         if (target == null) {
-            sender.sendMessage("§cPlayer not found.");
+            plugin.feedback().command(sender, "§cPlayer not found");
             return true;
         }
         int amount = 1;
@@ -47,8 +47,8 @@ public final class CoreCommand implements CommandExecutor, TabCompleter {
             var leftovers = target.getInventory().addItem(plugin.cores().createCore());
             leftovers.values().forEach(stack -> target.getWorld().dropItemNaturally(target.getLocation(), stack));
         }
-        sender.sendMessage("§aGave §f" + amount + "§a Waystone Core(s) to §f" + target.getName() + "§a.");
-        if (!sender.equals(target)) target.sendMessage("§dYou received §f" + amount + "§d Waystone Core(s).");
+        plugin.feedback().command(sender, "§aGave §f" + amount + "§a Waystone Core(s) to §f" + target.getName());
+        if (!sender.equals(target)) plugin.feedback().action(target, "§dReceived §f" + amount + " §dWaystone Core(s)");
         return true;
     }
 
