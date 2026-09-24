@@ -94,6 +94,11 @@ public final class WaystoneListener implements Listener {
                 }
                 event.setCancelled(true); return;
             }
+
+            if (event.getAction() == Action.RIGHT_CLICK_BLOCK && plugin.getConfig().getBoolean("gui.enabled", true)) {
+                event.setCancelled(true);
+                plugin.gui().openMain(player, clickedWaystone);
+            }
             return;
         }
 
