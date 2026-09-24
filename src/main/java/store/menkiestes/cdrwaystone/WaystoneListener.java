@@ -153,18 +153,9 @@ public final class WaystoneListener implements Listener {
             return;
         }
 
-        if (hand.getType() == Material.NAME_TAG && hand.hasItemMeta() && hand.getItemMeta().hasDisplayName()) {
+        if (isNamedNameTag(hand)) {
             event.setCancelled(true);
-            if (!plugin.access().canManage(player, clickedWaystone) && !player.hasPermission("cdrwaystone.admin")) {
-                plugin.feedback().action(player, "§cYou cannot rename this Waystone");
-                return;
-            }
-            String newName = PlainTextComponentSerializer.plainText().serialize(hand.getItemMeta().displayName());
-            if (!newName.isBlank()) {
-                clickedWaystone.name(newName);
-                plugin.registry().save();
-                plugin.feedback().action(player, "§aWaystone renamed §7• §f" + newName);
-            }
+            renameWaystone(player, clickedWaystone, hand);
             return;
         }
 
@@ -179,7 +170,47 @@ public final class WaystoneListener implements Listener {
         if (data == null) return;
         event.setCancelled(true);
         if (event.getHand() != EquipmentSlot.HAND) return;
-        openNetwork(event.getPlayer(), data, event.getPlayer().getInventory().getItemInMainHand());
+
+        Player player = event.getPlayer();
+        ItemStack hand = player.getInventory().getItemInMainHand();
+
+        if (!plugin.access().canAccess(player, data)) {
+            plugin.feedback().action(player, "§cWaystone access denied");
+            return;
+        }
+
+        plugin.discovery().discover(player, data, false);
+
+        if (plugin.cores().isCore(hand)) {
+            plugin.cores().activate(player, data, hand);
+            return;
+        }
+
+        if (isNamedNameTag(hand)) {
+            renameWaystone(player, data, hand);
+            return;
+        }
+
+        openNetwork(player, data, hand);
+    }
+
+    private boolean isNamedNameTag(ItemStack hand) {
+        return hand != null
+                && hand.getType() == Material.NAME_TAG
+                && hand.hasItemMeta()
+                && hand.getItemMeta().hasDisplayName();
+    }
+
+    private void renameWaystone(Player player, WaystoneData waystone, ItemStack hand) {
+        if (!plugin.access().canManage(player, waystone) && !player.hasPermission("cdrwaystone.admin")) {
+            plugin.feedback().action(player, "§cYou cannot rename this Waystone");
+            return;
+        }
+        String newName = PlainTextComponentSerializer.plainText().serialize(hand.getItemMeta().displayName());
+        if (newName.isBlank()) return;
+        waystone.name(newName);
+        plugin.registry().save();
+        plugin.feedback().action(player, "§aWaystone renamed §7• §f" + newName);
     }
 
     private void openNetwork(Player player, WaystoneData waystone, ItemStack hand) {
