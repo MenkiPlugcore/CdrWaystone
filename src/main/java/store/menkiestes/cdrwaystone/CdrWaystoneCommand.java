@@ -17,13 +17,14 @@ public final class CdrWaystoneCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0) {
-            sender.sendMessage("§dCdrWaystone §7v" + plugin.getPluginMeta().getVersion() + " §8| §f/cws info, access, trust, transfer, admin");
+            sender.sendMessage("§dCdrWaystone §7v" + plugin.getPluginMeta().getVersion() + " §8| §f/cws info, category, access, trust, transfer, admin");
             return true;
         }
         switch (args[0].toLowerCase(Locale.ROOT)) {
             case "skins" -> sender.sendMessage("§dSkins: §f" + String.join(", ", plugin.skins().keySet()));
             case "getkey" -> getKey(sender, args);
             case "skin" -> setSkin(sender, args);
+            case "category" -> setCategory(sender, args);
             case "access" -> setAccess(sender, args);
             case "trust" -> trust(sender, args, true);
             case "untrust" -> trust(sender, args, false);
@@ -64,6 +65,21 @@ public final class CdrWaystoneCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§aWaystone skin changed to §f" + skin + ".");
     }
 
+    private void setCategory(CommandSender sender, String[] args) {
+        Player player = requirePlayer(sender); if (player == null) return;
+        WaystoneData data = ownedTarget(player); if (data == null) return;
+        if (args.length < 2) {
+            sender.sendMessage("§dCategory: §f" + data.category());
+            sender.sendMessage("§7Use /cws category <capital|city|village|dungeon|kingdom|player|event|other>");
+            return;
+        }
+        WaystoneData.Category category = parseCategory(args[1]);
+        if (category == null) { sender.sendMessage("§cUnknown category."); return; }
+        data.category(category);
+        plugin.registry().save();
+        sender.sendMessage("§aWaystone category changed to §f" + category + ".");
+    }
+
     private void setAccess(CommandSender sender, String[] args) {
         Player player = requirePlayer(sender); if (player == null) return;
         WaystoneData data = ownedTarget(player); if (data == null) return;
@@ -74,8 +90,7 @@ public final class CdrWaystoneCommand implements CommandExecutor, TabCompleter {
         }
         try {
             WaystoneData.AccessMode mode = WaystoneData.AccessMode.valueOf(args[1].toUpperCase(Locale.ROOT));
-            data.accessMode(mode);
-            plugin.registry().save();
+            data.accessMode(mode); plugin.registry().save();
             sender.sendMessage("§aWaystone access changed to §f" + mode + ".");
         } catch (IllegalArgumentException ex) {
             sender.sendMessage("§cAccess must be PRIVATE, TRUSTED, or PUBLIC.");
@@ -91,9 +106,7 @@ public final class CdrWaystoneCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage("§cPlayer not found, or that player is already the owner."); return;
         }
         boolean changed = add ? data.trust(target.getUniqueId()) : data.untrust(target.getUniqueId());
-        if (!changed) {
-            sender.sendMessage(add ? "§7That player is already trusted." : "§7That player is not trusted."); return;
-        }
+        if (!changed) { sender.sendMessage(add ? "§7That player is already trusted." : "§7That player is not trusted."); return; }
         if (add && data.accessMode() == WaystoneData.AccessMode.PRIVATE) data.accessMode(WaystoneData.AccessMode.TRUSTED);
         plugin.registry().save();
         sender.sendMessage((add ? "§aTrusted §f" : "§eRemoved trust for §f") + displayName(target) + "§7. Access mode: §f" + data.accessMode());
@@ -118,16 +131,15 @@ public final class CdrWaystoneCommand implements CommandExecutor, TabCompleter {
         if (!plugin.access().canReceiveTransfer(target, data)) {
             sender.sendMessage("§c" + target.getName() + " has reached their Player Waystone limit."); return;
         }
-
         UUID oldOwner = data.owner();
         data.owner(target.getUniqueId());
         data.accessMode(WaystoneData.AccessMode.PRIVATE);
+        data.category(WaystoneData.Category.PLAYER);
         data.clearTrusted();
         plugin.registry().save();
         if (oldOwner != null) plugin.discovery().setState(oldOwner, data.id(), DiscoveryService.State.DISCOVERED, false);
         plugin.discovery().setState(target.getUniqueId(), data.id(), DiscoveryService.State.ACTIVATED, true);
-
-        sender.sendMessage("§aOwnership transferred to §f" + target.getName() + "§a. Access reset to PRIVATE and trusted list cleared.");
+        sender.sendMessage("§aOwnership transferred to §f" + target.getName() + "§a. Access reset to PRIVATE and category reset to PLAYER.");
         target.sendMessage("§dYou now own Waystone §f" + data.name() + "§d. It has been activated for you.");
     }
 
@@ -142,7 +154,7 @@ public final class CdrWaystoneCommand implements CommandExecutor, TabCompleter {
         if (!admin(sender)) return;
         Player player = requirePlayer(sender); if (player == null) return;
         if (args.length < 2) {
-            sender.sendMessage("§6Admin Waystone: §f/cws admin create <name>, remove, setpublic, setfree, setpermanent, setactive, setglobal, skin, info");
+            sender.sendMessage("§6Admin Waystone: §f/cws admin create <name>, remove, category, setpublic, setfree, setpermanent, setactive, setglobal, skin, info");
             return;
         }
         String action = args[1].toLowerCase(Locale.ROOT);
@@ -155,26 +167,27 @@ public final class CdrWaystoneCommand implements CommandExecutor, TabCompleter {
             String skin = plugin.getConfig().getString("admin-waystones.default-skin", "divine");
             if (!plugin.skins().containsKey(skin)) skin = "andesite";
             boolean global = plugin.getConfig().getBoolean("admin-waystones.default-globally-discovered", true);
+            WaystoneData.Category category = parseCategory(plugin.getConfig().getString("categories.default-admin", "CITY"));
+            if (category == null) category = WaystoneData.Category.CITY;
             if (data == null) {
                 data = plugin.registry().create(null, block.getLocation(), name, skin, WaystoneData.Type.ADMIN,
                         plugin.getConfig().getBoolean("admin-waystones.default-public", true),
                         plugin.getConfig().getBoolean("admin-waystones.default-free", true),
                         plugin.getConfig().getBoolean("admin-waystones.default-permanent", true),
-                        plugin.getConfig().getBoolean("admin-waystones.default-always-active", true), global);
+                        plugin.getConfig().getBoolean("admin-waystones.default-always-active", true), global,
+                        WaystoneData.AccessMode.PRIVATE, Set.of(), category);
             } else {
-                data.type(WaystoneData.Type.ADMIN); data.owner(null); data.name(name); data.skin(skin);
+                data.type(WaystoneData.Type.ADMIN); data.owner(null); data.name(name); data.skin(skin); data.category(category);
                 data.publicAccess(plugin.getConfig().getBoolean("admin-waystones.default-public", true));
                 data.freeTravel(plugin.getConfig().getBoolean("admin-waystones.default-free", true));
                 data.permanent(plugin.getConfig().getBoolean("admin-waystones.default-permanent", true));
                 data.alwaysActive(plugin.getConfig().getBoolean("admin-waystones.default-always-active", true));
-                data.globallyDiscovered(global);
-                data.accessMode(WaystoneData.AccessMode.PRIVATE);
-                data.clearTrusted();
+                data.globallyDiscovered(global); data.accessMode(WaystoneData.AccessMode.PRIVATE); data.clearTrusted();
                 plugin.registry().save();
             }
             plugin.discovery().setState(player.getUniqueId(), data.id(), DiscoveryService.State.ACTIVATED, true);
             plugin.visuals().ensureCollision(data); plugin.visuals().spawn(data);
-            sender.sendMessage("§6Admin Waystone created: §f" + data.name() + " §7(Global Discovery: " + data.globallyDiscovered() + ")");
+            sender.sendMessage("§6Admin Waystone created: §f" + data.name() + " §7(Category: " + data.category() + ")");
             return;
         }
 
@@ -183,6 +196,13 @@ public final class CdrWaystoneCommand implements CommandExecutor, TabCompleter {
             case "remove" -> {
                 plugin.visuals().remove(data); plugin.registry().remove(data); plugin.discovery().forgetWaystone(data.id());
                 sender.sendMessage("§eAdmin Waystone registry entry removed. Lodestone left in place.");
+            }
+            case "category" -> {
+                if (args.length < 3) { sender.sendMessage("§cUsage: /cws admin category <category>"); return; }
+                WaystoneData.Category category = parseCategory(args[2]);
+                if (category == null) { sender.sendMessage("§cUnknown category."); return; }
+                data.category(category); plugin.registry().save();
+                sender.sendMessage("§aAdmin Waystone category = §f" + category);
             }
             case "setpublic" -> toggle(sender, args, "public", data);
             case "setfree" -> toggle(sender, args, "free", data);
@@ -224,7 +244,7 @@ public final class CdrWaystoneCommand implements CommandExecutor, TabCompleter {
     }
 
     private void showInfo(CommandSender sender, WaystoneData data) {
-        sender.sendMessage("§d" + data.name() + " §7[" + data.type() + " / " + data.skin() + "]");
+        sender.sendMessage("§d" + data.name() + " §7[" + data.type() + " / " + data.category() + " / " + data.skin() + "]");
         sender.sendMessage("§7ID: §f" + data.id());
         sender.sendMessage("§7Location: §f" + data.worldName() + " " + data.x() + ", " + data.y() + ", " + data.z());
         if (data.isAdmin()) {
@@ -265,6 +285,12 @@ public final class CdrWaystoneCommand implements CommandExecutor, TabCompleter {
         return null;
     }
 
+    private WaystoneData.Category parseCategory(String raw) {
+        if (raw == null) return null;
+        try { return WaystoneData.Category.valueOf(raw.toUpperCase(Locale.ROOT)); }
+        catch (IllegalArgumentException ex) { return null; }
+    }
+
     private OfflinePlayer resolveKnownPlayer(String name) {
         Player online = Bukkit.getPlayerExact(name);
         if (online != null) return online;
@@ -274,30 +300,26 @@ public final class CdrWaystoneCommand implements CommandExecutor, TabCompleter {
         return null;
     }
 
-    private String displayName(OfflinePlayer player) {
-        return player.getName() == null ? player.getUniqueId().toString() : player.getName();
-    }
-
-    private Player requirePlayer(CommandSender sender) {
-        if (sender instanceof Player player) return player;
-        sender.sendMessage("§cPlayer only."); return null;
-    }
-
+    private String displayName(OfflinePlayer player) { return player.getName() == null ? player.getUniqueId().toString() : player.getName(); }
+    private Player requirePlayer(CommandSender sender) { if (sender instanceof Player player) return player; sender.sendMessage("§cPlayer only."); return null; }
     private boolean admin(CommandSender sender) { if (sender.hasPermission("cdrwaystone.admin")) return true; sender.sendMessage("§cNo permission."); return false; }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if (args.length == 1) return filter(args[0], List.of("getkey","skin","skins","access","trust","untrust","trusted","transfer","limit","admin","refresh","reload","info","remove"));
+        if (args.length == 1) return filter(args[0], List.of("getkey","skin","skins","category","access","trust","untrust","trusted","transfer","limit","admin","refresh","reload","info","remove"));
         if (args.length == 2 && args[0].equalsIgnoreCase("skin")) return filter(args[1], new ArrayList<>(plugin.skins().keySet()));
+        if (args.length == 2 && args[0].equalsIgnoreCase("category")) return filter(args[1], categoryNames());
         if (args.length == 2 && args[0].equalsIgnoreCase("getkey")) return filter(args[1], onlineNames());
         if (args.length == 2 && args[0].equalsIgnoreCase("access")) return filter(args[1], List.of("private","trusted","public"));
         if (args.length == 2 && List.of("trust","untrust","transfer").contains(args[0].toLowerCase(Locale.ROOT))) return filter(args[1], onlineNames());
-        if (args.length == 2 && args[0].equalsIgnoreCase("admin")) return filter(args[1], List.of("create","remove","setpublic","setfree","setpermanent","setactive","setglobal","skin","info"));
+        if (args.length == 2 && args[0].equalsIgnoreCase("admin")) return filter(args[1], List.of("create","remove","category","setpublic","setfree","setpermanent","setactive","setglobal","skin","info"));
+        if (args.length == 3 && args[0].equalsIgnoreCase("admin") && args[1].equalsIgnoreCase("category")) return filter(args[2], categoryNames());
         if (args.length == 3 && args[0].equalsIgnoreCase("admin") && List.of("setpublic","setfree","setpermanent","setactive","setglobal").contains(args[1].toLowerCase(Locale.ROOT))) return filter(args[2], List.of("true","false"));
         if (args.length == 3 && args[0].equalsIgnoreCase("admin") && args[1].equalsIgnoreCase("skin")) return filter(args[2], new ArrayList<>(plugin.skins().keySet()));
         return Collections.emptyList();
     }
 
+    private List<String> categoryNames() { return Arrays.stream(WaystoneData.Category.values()).map(v -> v.name().toLowerCase(Locale.ROOT)).toList(); }
     private List<String> onlineNames() { return Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList()); }
     private List<String> filter(String input, List<String> choices) { String lower=input.toLowerCase(Locale.ROOT); return choices.stream().filter(s->s.toLowerCase(Locale.ROOT).startsWith(lower)).sorted().toList(); }
 }
