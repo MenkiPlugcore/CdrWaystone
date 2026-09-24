@@ -1,4 +1,4 @@
-# CdrWaystone v0.2.1
+# CdrWaystone v0.3.0
 # Paper 1.21.11 + Java 21
 
 waystones:
@@ -11,6 +11,16 @@ admin-waystones:
   default-free: true
   default-permanent: true
   default-always-active: true
+  # Makes new Admin Waystones appear as DISCOVERED to every player.
+  # Players still activate them individually before travel.
+  default-globally-discovered: true
+
+discovery:
+  enabled: true
+  # First-time discovery radius around a Waystone, in blocks.
+  radius: 8.0
+  # 20 ticks = 1 second. Minimum runtime value is 20 ticks.
+  scan-interval-ticks: 20
 
 warp:
   delay-seconds: 5
