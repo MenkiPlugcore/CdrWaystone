@@ -61,7 +61,8 @@ public final class WaystoneListener implements Listener {
         Block block = event.getBlock();
         WaystoneData barrierWaystone = waystoneFromClickedBlock(block);
         if (block.getType() == Material.BARRIER && barrierWaystone != null && barrierWaystone.collisionOwned()) {
-            event.setCancelled(true); return;
+            event.setCancelled(true);
+            return;
         }
         WaystoneData data = plugin.registry().find(block.getLocation());
         if (data == null) return;
@@ -115,43 +116,51 @@ public final class WaystoneListener implements Listener {
 
             if (hand.getType() == Material.NAME_TAG && hand.hasItemMeta() && hand.getItemMeta().hasDisplayName()) {
                 if (!plugin.access().canManage(player, clickedWaystone)) {
-                    player.sendMessage("§cYou cannot rename this Waystone."); event.setCancelled(true); return;
+                    player.sendMessage("§cYou cannot rename this Waystone.");
+                    event.setCancelled(true);
+                    return;
                 }
                 String newName = PlainTextComponentSerializer.plainText().serialize(hand.getItemMeta().displayName());
                 if (!newName.isBlank()) {
-                    clickedWaystone.name(newName); plugin.registry().save();
+                    clickedWaystone.name(newName);
+                    plugin.registry().save();
                     player.sendMessage("§aWaystone renamed to §f" + newName);
                 }
-                event.setCancelled(true); return;
+                event.setCancelled(true);
+                return;
             }
 
             if (plugin.keys().isKey(hand)) {
-                if (!player.hasPermission("cdrwaystone.use")) return;
-                if (!clickedWaystone.coreActive() && !(clickedWaystone.isAdmin() && plugin.getConfig().getBoolean("core.admin-bypass", true))) {
-                    player.sendMessage("§5This Waystone is Dormant. §7Install a §dWaystone Core§7 before binding a Key.");
-                    event.setCancelled(true); return;
+                event.setCancelled(true);
+                plugin.keys().clearLegacyBinding(hand);
+                if (!player.hasPermission("cdrwaystone.use")) {
+                    player.sendMessage("§cYou do not have permission to use the Waystone Network.");
+                    return;
+                }
+                if (!coreOperational(clickedWaystone)) {
+                    player.sendMessage("§5This Waystone is Dormant. §7Install a §dWaystone Core§7 before opening its Network.");
+                    return;
                 }
                 if (!plugin.discovery().canUse(player, clickedWaystone)) {
-                    player.sendMessage("§dThis Waystone must be activated first. §7Right-click it normally and use the Activate button.");
-                    event.setCancelled(true); return;
+                    player.sendMessage("§dActivate this Waystone before using it as a Network origin.");
+                    return;
                 }
                 if (plugin.teleports().isSuppressed(clickedWaystone)) {
-                    player.sendMessage("§cThis Waystone is suppressed."); event.setCancelled(true); return;
+                    player.sendMessage("§cThis Waystone is suppressed, so its Network is offline.");
+                    return;
                 }
-                java.util.UUID existing = plugin.keys().target(hand);
-                boolean relinkable = plugin.getConfig().getBoolean("key.relinkable", true);
-                if (existing == null || (relinkable && player.isSneaking())) {
-                    plugin.keys().bind(hand, clickedWaystone);
-                    player.sendMessage("§dWaystone Key bound to §f" + clickedWaystone.name());
-                } else if (existing.equals(clickedWaystone.id())) player.sendMessage("§7This key is already bound here.");
-                else player.sendMessage("§7Sneak + right-click a Waystone to relink this key.");
-                event.setCancelled(true); return;
+                if (!plugin.getConfig().getBoolean("network.enabled", true)) {
+                    player.sendMessage("§cWaystone Network Travel is disabled.");
+                    return;
+                }
+                plugin.networkGui().open(player, clickedWaystone);
+                return;
             }
 
             if (event.getAction() == Action.RIGHT_CLICK_BLOCK && plugin.getConfig().getBoolean("gui.enabled", true)) {
                 event.setCancelled(true);
                 if (player.isSneaking() && hand.getType().isAir() && plugin.getConfig().getBoolean("network.enabled", true)) {
-                    if (!clickedWaystone.coreActive() && !(clickedWaystone.isAdmin() && plugin.getConfig().getBoolean("core.admin-bypass", true))) {
+                    if (!coreOperational(clickedWaystone)) {
                         player.sendMessage("§5This Waystone is Dormant. §7Install a §dWaystone Core§7 before opening its Network.");
                     } else {
                         plugin.networkGui().open(player, clickedWaystone);
@@ -164,11 +173,9 @@ public final class WaystoneListener implements Listener {
         }
 
         if (plugin.keys().isKey(hand)) {
-            java.util.UUID targetId = plugin.keys().target(hand);
-            if (targetId == null) { player.sendMessage("§7This Waystone Key is not bound yet."); return; }
-            WaystoneData target = plugin.registry().get(targetId);
-            if (target == null) { player.sendMessage("§cThe linked Waystone no longer exists."); return; }
-            plugin.teleports().start(player, target); event.setCancelled(true);
+            event.setCancelled(true);
+            plugin.keys().clearLegacyBinding(hand);
+            player.sendMessage("§7The Waystone Key is no longer a portable teleport. §dUse it on an activated Waystone §7to open that Waystone's Network.");
         }
     }
 
@@ -195,7 +202,9 @@ public final class WaystoneListener implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onDamage(EntityDamageEvent event) {
-        if (event.getEntity() instanceof Player player && plugin.getConfig().getBoolean("warp.damage-cancels", true)) plugin.teleports().cancel(player, "damaged");
+        if (event.getEntity() instanceof Player player && plugin.getConfig().getBoolean("warp.damage-cancels", true)) {
+            plugin.teleports().cancel(player, "damaged");
+        }
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -203,17 +212,28 @@ public final class WaystoneListener implements Listener {
         if (!plugin.getConfig().getBoolean("warp.movement-cancels", false) || !plugin.teleports().isWarping(event.getPlayer())) return;
         Location start = plugin.teleports().startLocation(event.getPlayer());
         if (start == null || event.getTo() == null) return;
-        if (start.getBlockX()!=event.getTo().getBlockX() || start.getBlockY()!=event.getTo().getBlockY() || start.getBlockZ()!=event.getTo().getBlockZ()) plugin.teleports().cancel(event.getPlayer(), "moved");
+        if (start.getBlockX() != event.getTo().getBlockX()
+                || start.getBlockY() != event.getTo().getBlockY()
+                || start.getBlockZ() != event.getTo().getBlockZ()) {
+            plugin.teleports().cancel(event.getPlayer(), "moved");
+        }
     }
 
-    @EventHandler public void onQuit(PlayerQuitEvent event) { plugin.teleports().cancel(event.getPlayer(), "disconnected"); }
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        plugin.teleports().cancel(event.getPlayer(), "disconnected");
+    }
 
     @EventHandler
     public void onChunkLoad(ChunkLoadEvent event) {
         List<WaystoneData> stale = new ArrayList<>();
         for (WaystoneData data : plugin.registry().inChunk(event.getWorld(), event.getChunk().getX(), event.getChunk().getZ())) {
             Location location = data.location();
-            if (location == null || location.getBlock().getType() != Material.LODESTONE) { plugin.visuals().remove(data); stale.add(data); continue; }
+            if (location == null || location.getBlock().getType() != Material.LODESTONE) {
+                plugin.visuals().remove(data);
+                stale.add(data);
+                continue;
+            }
             plugin.visuals().ensureCollision(data);
             plugin.getServer().getScheduler().runTask(plugin, () -> plugin.visuals().spawn(data));
         }
@@ -226,17 +246,26 @@ public final class WaystoneListener implements Listener {
         }
     }
 
-    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH) public void onEntityExplode(EntityExplodeEvent event) { handleExplosion(event.blockList()); }
-    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH) public void onBlockExplode(BlockExplodeEvent event) { handleExplosion(event.blockList()); }
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
+    public void onEntityExplode(EntityExplodeEvent event) { handleExplosion(event.blockList()); }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
+    public void onBlockExplode(BlockExplodeEvent event) { handleExplosion(event.blockList()); }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
     public void onPistonExtend(BlockPistonExtendEvent event) {
-        if (plugin.getConfig().getBoolean("protection.pistons", true) && event.getBlocks().stream().anyMatch(this::isManagedWaystoneBlock)) event.setCancelled(true);
+        if (plugin.getConfig().getBoolean("protection.pistons", true)
+                && event.getBlocks().stream().anyMatch(this::isManagedWaystoneBlock)) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
     public void onPistonRetract(BlockPistonRetractEvent event) {
-        if (plugin.getConfig().getBoolean("protection.pistons", true) && event.getBlocks().stream().anyMatch(this::isManagedWaystoneBlock)) event.setCancelled(true);
+        if (plugin.getConfig().getBoolean("protection.pistons", true)
+                && event.getBlocks().stream().anyMatch(this::isManagedWaystoneBlock)) {
+            event.setCancelled(true);
+        }
     }
 
     private void handleExplosion(List<Block> blocks) {
@@ -244,26 +273,42 @@ public final class WaystoneListener implements Listener {
             WaystoneData data = dataFromManagedBlock(block);
             return data != null && data.isAdmin() && data.permanent();
         });
-        if (plugin.getConfig().getBoolean("protection.explosions", true)) { blocks.removeIf(this::isManagedWaystoneBlock); return; }
-        List<WaystoneData> affected = blocks.stream().map(block -> plugin.registry().find(block.getLocation())).filter(java.util.Objects::nonNull).distinct().toList();
+        if (plugin.getConfig().getBoolean("protection.explosions", true)) {
+            blocks.removeIf(this::isManagedWaystoneBlock);
+            return;
+        }
+
+        List<WaystoneData> affected = blocks.stream()
+                .map(block -> plugin.registry().find(block.getLocation()))
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
         if (affected.isEmpty()) return;
+
         plugin.getServer().getScheduler().runTask(plugin, () -> {
             boolean changed = false;
             for (WaystoneData data : affected) {
                 Location location = data.location();
                 if (location != null && location.getBlock().getType() != Material.LODESTONE) {
-                    plugin.visuals().remove(data); plugin.registry().remove(data, false); plugin.discovery().forgetWaystone(data.id()); changed = true;
+                    plugin.visuals().remove(data);
+                    plugin.registry().remove(data, false);
+                    plugin.discovery().forgetWaystone(data.id());
+                    changed = true;
                 }
             }
             if (changed) plugin.registry().save();
         });
     }
 
+    private boolean coreOperational(WaystoneData data) {
+        return data.coreActive() || (data.isAdmin() && plugin.getConfig().getBoolean("core.admin-bypass", true));
+    }
+
     private WaystoneData dataFromManagedBlock(Block block) {
         WaystoneData direct = plugin.registry().find(block.getLocation());
         if (direct != null) return direct;
         if (block.getType() == Material.BARRIER) {
-            WaystoneData below = plugin.registry().find(block.getRelative(0,-1,0).getLocation());
+            WaystoneData below = plugin.registry().find(block.getRelative(0, -1, 0).getLocation());
             if (below != null && below.collisionOwned()) return below;
         }
         return null;
