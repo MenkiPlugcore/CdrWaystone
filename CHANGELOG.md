@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.1 - Admin Waystone System
+
+- Added first-class `PLAYER` and `ADMIN` Waystone types with backward-compatible migration for existing data.
+- Added official server-owned Admin Waystones with no player owner requirement.
+- Added `/cws admin create <name>` to create or promote the targeted Lodestone/Waystone into an Admin Waystone.
+- Added `/cws admin remove`, `setpublic`, `setfree`, `setpermanent`, `setactive`, `skin`, and `info` controls.
+- Added default Admin Waystone settings in `config.yml`: Divine skin, public, free, permanent and always-active.
+- Added permanent Admin Waystone protection against ordinary block breaking and explosions.
+- Added private Admin Waystones that reject normal-player key binding and travel when public access is disabled.
+- Added Always Active mode which bypasses suppression and Respawn Anchor power requirements.
+- Added persistent public/free/permanent/always-active metadata to `waystones.yml`.
+- Added gold/orange Admin Waystone GUI presentation and a dedicated interactive Admin Control panel.
+- Admin GUI toggles save instantly for Public Access, Free Travel, Permanent and Always Active.
+- Admin Waystones can still use the full 19-skin gallery.
+
 ## 0.2.0 - Waystone GUI System
 
 - Added a premium 6-row Waystone management GUI opened by right-clicking a Waystone without a Key/Name Tag.
