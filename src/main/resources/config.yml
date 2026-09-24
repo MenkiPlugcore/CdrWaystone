@@ -7,6 +7,16 @@ waystones:
   auto-register-lodestones: true
   default-name: "Waystone"
 
+# Dedicated v0.6.4 defaults for Lodestones placed by staff.
+# These keys are new, so existing v0.6.3 configs receive them automatically.
+staff-placement:
+  public: true
+  free: false
+  permanent: false
+  always-active: true
+  globally-discovered: true
+  category: CITY
+
 ownership:
   max-waystones-per-player: 3
   default-access: PRIVATE
@@ -15,13 +25,11 @@ categories:
   default-player: PLAYER
   default-admin: CITY
 
-# Staff-created Waystones are official ADMIN network nodes.
+# Controls for Admin Waystones created/edited through admin commands.
 admin-waystones:
   default-skin: divine
   default-public: true
-  # Paid travel is the production default.
   default-free: false
-  # New staff-placed nodes stay removable while setting up the map.
   default-permanent: false
   default-always-active: true
   default-globally-discovered: true
@@ -42,7 +50,6 @@ discovery:
   radius: 8.0
   scan-interval-ticks: 20
 
-# Travel is strictly Waystone -> Waystone.
 network:
   enabled: true
   origin-radius: 6.5
@@ -129,7 +136,6 @@ portal-sickness:
   damage: 5.0
 
 # v0.6.4 uses native ItemsAdder CustomFurniture.
-# The plugin no longer extracts the custom item into its own Bukkit ItemDisplay.
 visuals:
   enabled: true
   default-skin: andesite
