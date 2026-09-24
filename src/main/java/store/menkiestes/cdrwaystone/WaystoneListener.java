@@ -132,7 +132,12 @@ public final class WaystoneListener implements Listener {
             }
 
             if (event.getAction() == Action.RIGHT_CLICK_BLOCK && plugin.getConfig().getBoolean("gui.enabled", true)) {
-                event.setCancelled(true); plugin.gui().openMain(player, clickedWaystone);
+                event.setCancelled(true);
+                if (player.isSneaking() && hand.getType().isAir() && plugin.getConfig().getBoolean("network.enabled", true)) {
+                    plugin.networkGui().open(player, clickedWaystone);
+                } else {
+                    plugin.gui().openMain(player, clickedWaystone);
+                }
             }
             return;
         }
