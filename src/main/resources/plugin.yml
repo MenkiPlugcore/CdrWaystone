@@ -4,7 +4,7 @@ main: store.menkiestes.cdrwaystone.CdrWaystonePlugin
 api-version: '1.21'
 authors: [CADERA]
 description: Native Waystone system for Vephilim with ItemsAdder visual skins.
-softdepend: [ItemsAdder]
+softdepend: [ItemsAdder, Vault]
 commands:
   cdrwaystone:
     description: Main CdrWaystone command
@@ -19,6 +19,9 @@ permissions:
     default: true
   cdrwaystone.limit.bypass:
     description: Bypasses the Player Waystone ownership limit
+    default: op
+  cdrwaystone.cost.bypass:
+    description: Bypasses all CdrWaystone travel costs
     default: op
   cdrwaystone.admin:
     description: Administrative access to CdrWaystone and Admin Waystones
