@@ -18,6 +18,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     private KeyService keys;
     private VisualService visuals;
     private EconomyService economy;
+    private TravelGuardService guards;
     private TeleportService teleports;
     private MaintenanceService maintenance;
     private DiscoveryService discovery;
@@ -39,6 +40,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         visuals = new VisualService(this);
         access = new AccessService(this);
         economy = new EconomyService(this);
+        guards = new TravelGuardService(this);
         teleports = new TeleportService(this);
         maintenance = new MaintenanceService(this);
         discovery = new DiscoveryService(this);
@@ -82,6 +84,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         mergeConfigDefaults();
         loadSkins();
         if (economy != null) economy.reload();
+        if (guards != null) guards.reload();
         registerKeyRecipe();
         visuals.refreshAllLoaded();
         if (maintenance != null) maintenance.start();
@@ -128,6 +131,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     public KeyService keys() { return keys; }
     public VisualService visuals() { return visuals; }
     public EconomyService economy() { return economy; }
+    public TravelGuardService guards() { return guards; }
     public TeleportService teleports() { return teleports; }
     public MaintenanceService maintenance() { return maintenance; }
     public DiscoveryService discovery() { return discovery; }
