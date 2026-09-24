@@ -59,6 +59,7 @@ public final class TeleportService {
         startLocations.remove(player.getUniqueId());
         if (task != null) { task.cancel(); if (player.isOnline()) player.sendActionBar(Component.text("Warp cancelled: " + reason)); }
     }
+
     public void cancelAll() { for (BukkitTask task : active.values()) task.cancel(); active.clear(); startLocations.clear(); }
     public Location startLocation(Player player) { return startLocations.get(player.getUniqueId()); }
     private void cleanup(Player player) { active.remove(player.getUniqueId()); startLocations.remove(player.getUniqueId()); }
@@ -67,9 +68,13 @@ public final class TeleportService {
         Location targetLoc = target.location();
         if (targetLoc == null) { player.sendMessage("§cThat Waystone world is unavailable."); return false; }
         if (targetLoc.getBlock().getType() != Material.LODESTONE) { player.sendMessage("§cThat Waystone no longer exists."); return false; }
-        if (target.isAdmin() && !target.publicAccess() && !player.hasPermission("cdrwaystone.admin")) {
-            player.sendMessage("§cThat Admin Waystone is not public."); return false;
+
+        if (!plugin.access().canAccess(player, target)) {
+            if (target.isAdmin()) player.sendMessage("§cThat Admin Waystone is not public.");
+            else player.sendMessage("§cYou no longer have access to that Player Waystone.");
+            return false;
         }
+
         if (!plugin.discovery().canUse(player, target)) {
             DiscoveryService.State state = plugin.discovery().status(player, target);
             if (state == DiscoveryService.State.UNKNOWN) player.sendMessage("§7You have not discovered that Waystone yet.");
