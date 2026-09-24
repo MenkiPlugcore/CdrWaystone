@@ -22,6 +22,7 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     private DiscoveryService discovery;
     private AccessService access;
     private WaystoneGui gui;
+    private NetworkGui networkGui;
     private Map<String, String> skins = new LinkedHashMap<>();
 
     @Override
@@ -41,9 +42,11 @@ public final class CdrWaystonePlugin extends JavaPlugin {
         discovery = new DiscoveryService(this);
         discovery.load();
         gui = new WaystoneGui(this);
+        networkGui = new NetworkGui(this);
 
         getServer().getPluginManager().registerEvents(new WaystoneListener(this), this);
         getServer().getPluginManager().registerEvents(gui, this);
+        getServer().getPluginManager().registerEvents(networkGui, this);
         CdrWaystoneCommand commandHandler = new CdrWaystoneCommand(this);
         PluginCommand command = getCommand("cdrwaystone");
         if (command != null) {
@@ -126,5 +129,6 @@ public final class CdrWaystonePlugin extends JavaPlugin {
     public DiscoveryService discovery() { return discovery; }
     public AccessService access() { return access; }
     public WaystoneGui gui() { return gui; }
+    public NetworkGui networkGui() { return networkGui; }
     public Map<String, String> skins() { return skins; }
 }
