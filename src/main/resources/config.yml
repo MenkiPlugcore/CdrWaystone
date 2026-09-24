@@ -1,9 +1,16 @@
-# CdrWaystone v0.3.0
+# CdrWaystone v0.3.1
 # Paper 1.21.11 + Java 21
 
 waystones:
   auto-register-lodestones: true
   default-name: "Waystone"
+
+ownership:
+  # Maximum Player Waystones owned by one player.
+  # Permission cdrwaystone.limit.bypass ignores this limit.
+  max-waystones-per-player: 3
+  # PRIVATE, TRUSTED, PUBLIC
+  default-access: PRIVATE
 
 admin-waystones:
   default-skin: divine
