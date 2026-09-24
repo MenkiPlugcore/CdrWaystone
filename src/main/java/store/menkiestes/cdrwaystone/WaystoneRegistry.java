@@ -71,8 +71,12 @@ public final class WaystoneRegistry {
                     try { trusted.add(UUID.fromString(rawTrusted)); } catch (IllegalArgumentException ignored) {}
                 }
 
+                WaystoneData.Category category = parseCategory(
+                        yaml.getString(path + ".category"),
+                        type == WaystoneData.Type.ADMIN ? defaultAdminCategory() : defaultPlayerCategory());
+
                 WaystoneData data = new WaystoneData(id, owner, worldId, worldName, x, y, z, name, skin, collisionOwned,
-                        type, publicAccess, freeTravel, permanent, alwaysActive, globallyDiscovered, accessMode, trusted);
+                        type, publicAccess, freeTravel, permanent, alwaysActive, globallyDiscovered, accessMode, trusted, category);
                 byId.put(id, data);
                 byLocation.put(locationKey(worldId, x, y, z), id);
             } catch (Exception ex) {
@@ -100,6 +104,7 @@ public final class WaystoneRegistry {
             yaml.set(path + ".globally-discovered", data.globallyDiscovered());
             yaml.set(path + ".access-mode", data.accessMode().name());
             yaml.set(path + ".trusted", data.trustedPlayers().stream().map(UUID::toString).toList());
+            yaml.set(path + ".category", data.category().name());
         }
         File tempFile = new File(plugin.getDataFolder(), "waystones.yml.tmp");
         try {
@@ -118,30 +123,39 @@ public final class WaystoneRegistry {
         WaystoneData.AccessMode mode;
         try { mode = WaystoneData.AccessMode.valueOf(plugin.getConfig().getString("ownership.default-access", "PRIVATE").toUpperCase(Locale.ROOT)); }
         catch (IllegalArgumentException ex) { mode = WaystoneData.AccessMode.PRIVATE; }
-        return create(owner, location, name, skin, WaystoneData.Type.PLAYER, false, false, false, false, false, mode, Set.of());
+        return create(owner, location, name, skin, WaystoneData.Type.PLAYER, false, false, false, false, false,
+                mode, Set.of(), defaultPlayerCategory());
     }
 
     public synchronized WaystoneData create(UUID owner, Location location, String name, String skin, WaystoneData.Type type,
                                              boolean publicAccess, boolean freeTravel, boolean permanent, boolean alwaysActive) {
         return create(owner, location, name, skin, type, publicAccess, freeTravel, permanent, alwaysActive, false,
-                WaystoneData.AccessMode.PRIVATE, Set.of());
+                WaystoneData.AccessMode.PRIVATE, Set.of(), type == WaystoneData.Type.ADMIN ? defaultAdminCategory() : defaultPlayerCategory());
     }
 
     public synchronized WaystoneData create(UUID owner, Location location, String name, String skin, WaystoneData.Type type,
                                              boolean publicAccess, boolean freeTravel, boolean permanent,
                                              boolean alwaysActive, boolean globallyDiscovered) {
         return create(owner, location, name, skin, type, publicAccess, freeTravel, permanent, alwaysActive, globallyDiscovered,
-                WaystoneData.AccessMode.PRIVATE, Set.of());
+                WaystoneData.AccessMode.PRIVATE, Set.of(), type == WaystoneData.Type.ADMIN ? defaultAdminCategory() : defaultPlayerCategory());
     }
 
     public synchronized WaystoneData create(UUID owner, Location location, String name, String skin, WaystoneData.Type type,
                                              boolean publicAccess, boolean freeTravel, boolean permanent,
                                              boolean alwaysActive, boolean globallyDiscovered,
                                              WaystoneData.AccessMode accessMode, Set<UUID> trusted) {
+        return create(owner, location, name, skin, type, publicAccess, freeTravel, permanent, alwaysActive, globallyDiscovered,
+                accessMode, trusted, type == WaystoneData.Type.ADMIN ? defaultAdminCategory() : defaultPlayerCategory());
+    }
+
+    public synchronized WaystoneData create(UUID owner, Location location, String name, String skin, WaystoneData.Type type,
+                                             boolean publicAccess, boolean freeTravel, boolean permanent,
+                                             boolean alwaysActive, boolean globallyDiscovered,
+                                             WaystoneData.AccessMode accessMode, Set<UUID> trusted, WaystoneData.Category category) {
         UUID id = UUID.randomUUID();
         WaystoneData data = new WaystoneData(id, owner, location.getWorld().getUID(), location.getWorld().getName(),
                 location.getBlockX(), location.getBlockY(), location.getBlockZ(), name, skin, false,
-                type, publicAccess, freeTravel, permanent, alwaysActive, globallyDiscovered, accessMode, trusted);
+                type, publicAccess, freeTravel, permanent, alwaysActive, globallyDiscovered, accessMode, trusted, category);
         byId.put(id, data);
         byLocation.put(locationKey(location), id);
         save();
@@ -179,6 +193,20 @@ public final class WaystoneRegistry {
             if (data.worldId().equals(world.getUID()) && (data.x() >> 4) == chunkX && (data.z() >> 4) == chunkZ) list.add(data);
         }
         return list;
+    }
+
+    private WaystoneData.Category defaultPlayerCategory() {
+        return parseCategory(plugin.getConfig().getString("categories.default-player", "PLAYER"), WaystoneData.Category.PLAYER);
+    }
+
+    private WaystoneData.Category defaultAdminCategory() {
+        return parseCategory(plugin.getConfig().getString("categories.default-admin", "CITY"), WaystoneData.Category.CITY);
+    }
+
+    private WaystoneData.Category parseCategory(String raw, WaystoneData.Category fallback) {
+        if (raw == null || raw.isBlank()) return fallback;
+        try { return WaystoneData.Category.valueOf(raw.trim().toUpperCase(Locale.ROOT)); }
+        catch (IllegalArgumentException ignored) { return fallback; }
     }
 
     private String locationKey(Location location) { return locationKey(location.getWorld().getUID(), location.getBlockX(), location.getBlockY(), location.getBlockZ()); }
