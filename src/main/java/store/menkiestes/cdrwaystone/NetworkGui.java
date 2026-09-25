@@ -65,14 +65,16 @@ public final class NetworkGui implements Listener {
 
         if (destinations.isEmpty()) {
             inv.setItem(22, item(Material.GRAY_DYE, "No Active Destinations", NamedTextColor.GRAY,
-                    "No other activated Waystones are available"));
+                    "No available Waystones in this network"));
         }
 
         ItemStack filler = filler();
         for (int slot = 45; slot < 54; slot++) inv.setItem(slot, filler);
         if (page > 0) inv.setItem(45, item(Material.ARROW, "Previous", NamedTextColor.YELLOW, "Page " + page + " / " + pages));
         inv.setItem(47, item(Material.NETHER_STAR, origin.name(), NamedTextColor.GOLD,
-                "Origin Waystone", origin.worldName(), "Stay within " + formatRadius() + " blocks while charging"));
+                "Origin Waystone", "World: " + origin.worldName(),
+                plugin.getConfig().getBoolean("network.global-network", true) ? "Global Network" : "Local World Network",
+                "Stay within " + formatRadius() + " blocks while charging"));
         inv.setItem(49, item(Material.BARRIER, "Close", NamedTextColor.RED, "Close network"));
         inv.setItem(50, item(Material.ENDER_EYE, "Refresh", NamedTextColor.GREEN, "Refresh routes and prices"));
         if (page < pages - 1) inv.setItem(53, item(Material.ARROW, "Next", NamedTextColor.YELLOW, "Page " + (page + 2) + " / " + pages));
@@ -114,7 +116,9 @@ public final class NetworkGui implements Listener {
         }
 
         WaystoneData target = plugin.registry().get(targetId);
-        if (target == null || target.id().equals(origin.id()) || !isActiveDestination(player, target)) {
+        if (target == null || target.id().equals(origin.id())
+                || !isNetworkDestination(origin, target)
+                || !isActiveDestination(player, target)) {
             plugin.feedback().action(player, "§cDestination no longer active");
             open(player, origin, holder.page);
             return;
@@ -143,13 +147,24 @@ public final class NetworkGui implements Listener {
         List<WaystoneData> result = new ArrayList<>();
         for (WaystoneData data : plugin.registry().all()) {
             if (data.id().equals(origin.id())) continue;
+            if (!isNetworkDestination(origin, data)) continue;
             if (isActiveDestination(player, data)) result.add(data);
         }
         result.sort(Comparator
-                .comparing((WaystoneData data) -> !data.isAdmin())
+                .comparing((WaystoneData data) -> !data.worldId().equals(origin.worldId()))
+                .thenComparing(data -> !data.isAdmin())
+                .thenComparing(data -> data.worldName().toLowerCase(Locale.ROOT))
                 .thenComparing(data -> data.name().toLowerCase(Locale.ROOT))
                 .thenComparing(data -> data.id().toString()));
         return result;
+    }
+
+    private boolean isNetworkDestination(WaystoneData origin, WaystoneData target) {
+        if (origin == null || target == null) return false;
+        if (origin.worldId().equals(target.worldId())) return true;
+        if (!plugin.getConfig().getBoolean("network.global-network", true)) return false;
+        return plugin.getConfig().getBoolean("network.cross-world.enabled", true)
+                && plugin.getConfig().getBoolean("warp.allow-cross-world", true);
     }
 
     private boolean isActiveDestination(Player player, WaystoneData data) {
@@ -188,11 +203,16 @@ public final class NetworkGui implements Listener {
         TeleportService.TravelStatus status = plugin.teleports().travelStatus(player, target, origin);
         EconomyService.Quote quote = plugin.economy().quote(player, origin, target);
         boolean ready = status == TeleportService.TravelStatus.READY;
+        boolean crossWorld = !origin.worldId().equals(target.worldId());
         Material material = ready ? categoryMaterial(target.category()) : Material.RED_STAINED_GLASS_PANE;
         NamedTextColor color = ready ? NamedTextColor.GOLD : NamedTextColor.RED;
         String price = quote.free() ? "FREE" : quote.formatted();
+        String worldLine = plugin.getConfig().getBoolean("network.cross-world.show-world-name", true)
+                ? "World: " + target.worldName() : null;
 
         ItemStack stack = item(material, target.name(), color,
+                worldLine,
+                "Type: " + (crossWorld ? "Cross-World" : "Same World"),
                 "Distance: " + distance(origin, target),
                 "Cost: " + price,
                 "Status: " + plugin.teleports().statusLabel(status),
@@ -220,7 +240,7 @@ public final class NetworkGui implements Listener {
         Location from = origin.location();
         Location to = target.location();
         if (from == null || to == null) return "Unknown";
-        if (!origin.worldId().equals(target.worldId())) return "Cross-world";
+        if (!origin.worldId().equals(target.worldId())) return "Inter-world route";
         return Math.round(from.distance(to)) + " blocks";
     }
 
