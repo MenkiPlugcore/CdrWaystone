@@ -1,4 +1,4 @@
-# CdrWaystone v0.6.4.4
+# CdrWaystone v0.6.5
 # Paper 1.21.11 + Java 21
 
 waystones:
@@ -7,8 +7,7 @@ waystones:
   auto-register-lodestones: true
   default-name: "Waystone"
 
-# Dedicated v0.6.4 defaults for Lodestones placed by staff.
-# These keys are new, so existing v0.6.3 configs receive them automatically.
+# Dedicated defaults for Lodestones placed by staff.
 staff-placement:
   public: true
   free: false
@@ -50,10 +49,20 @@ discovery:
   radius: 8.0
   scan-interval-ticks: 20
 
+# v0.6.5 Global Cross-World Network.
 network:
   enabled: true
+  # true = the Network GUI may expose Waystones from every loaded Bukkit world.
+  # false = only Waystones in the origin world are shown.
+  global-network: true
   origin-radius: 6.5
   destinations-per-page: 45
+  cross-world:
+    enabled: true
+    # Public + operational official/Admin Waystones are usable globally without
+    # requiring each player to physically visit/activate the destination first.
+    official-waystones-auto-unlocked: true
+    show-world-name: true
 
 economy:
   enabled: true
@@ -101,10 +110,11 @@ warp:
   delay-seconds: 5
   damage-cancels: true
   movement-cancels: false
+  # Legacy route-engine safety switch retained for backwards compatibility.
   allow-cross-world: true
   safe-radius: 3
 
-# v0.6.4.4: solid laser display + rotating particle aura around the travelling player.
+# Solid laser display + rotating particle aura around the travelling player.
 teleport-effects:
   enabled: true
   # Height of the laser column in blocks. Clamped to 2-32.
