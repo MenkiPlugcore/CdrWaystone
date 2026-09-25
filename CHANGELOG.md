@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.6.5 - Global Cross-World Network
+
+- Added a first-class global Waystone Network spanning multiple Bukkit worlds.
+- Public, operational official/Admin Waystones can now be auto-unlocked for every player without requiring a physical visit to the destination world first.
+- Player-owned/private Waystones keep the existing per-player discovery and activation rules.
+- Added `network.global-network` to switch between global and origin-world-only destination lists.
+- Added `network.cross-world.enabled` to control whether destinations in other worlds are exposed through the Network GUI.
+- Added `network.cross-world.official-waystones-auto-unlocked` for official server infrastructure.
+- Added `network.cross-world.show-world-name` so destination cards clearly identify the target world.
+- Cross-world destination cards now show target world, route type, cost, status, and an inter-world distance label.
+- Same-world destinations are sorted before cross-world destinations for a cleaner travel list.
+- Existing cross-world pricing, safe arrival logic, cooldown/combat/knockout guards, laser charging effects, Vault payment, and screen-only feedback remain active.
+- Legacy `warp.allow-cross-world` remains as an additional route-engine safety switch for backwards compatibility.
+
 ## 0.6.4.4 - Laser Travel Effect
 
 - Replaced the vertical END_ROD charging column with a solid BlockDisplay laser so the Waystone reads visually like a beacon beam instead of a particle line.
@@ -133,7 +147,7 @@
 - Network pricing is calculated from the origin Waystone to the destination.
 - Waystone Key pricing is calculated from the player's position when the warp begins.
 - Travel cost is locked when countdown starts, affordability is checked again when countdown completes, and payment is charged immediately before teleport.
-- Failed Bukkit teleports automatically refund the travel payment and do not consume Respawn Anchor power.
+- Failed Bukkit teleports automatically refund payment and do not consume Respawn Anchor power.
 - Existing access, discovery, suppression, dimensional power, countdown, damage cancellation, safe-arrival, and Portal Sickness rules remain enforced.
 - Added optional Vault soft-load ordering while preserving startup without Vault.
 
