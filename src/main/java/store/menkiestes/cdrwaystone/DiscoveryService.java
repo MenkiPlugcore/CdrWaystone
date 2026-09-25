@@ -104,6 +104,12 @@ public final class DiscoveryService {
     public State status(Player player, WaystoneData data) {
         if (!plugin.getConfig().getBoolean("discovery.enabled", true)) return State.ACTIVATED;
         if (data.owner() != null && data.owner().equals(player.getUniqueId())) return State.ACTIVATED;
+
+        // v0.6.5 Global Network: public, operational official Waystones are
+        // globally activated for every player. They do not need to be visited
+        // first, including destinations that live in another Bukkit world.
+        if (isOfficialAutoUnlocked(data) && plugin.access().canAccess(player, data)) return State.ACTIVATED;
+
         State stored = storedState(player.getUniqueId(), data.id());
         if (stored != State.UNKNOWN) return stored;
         if (data.isAdmin() && data.globallyDiscovered() && plugin.access().canAccess(player, data)) return State.DISCOVERED;
@@ -111,13 +117,14 @@ public final class DiscoveryService {
     }
 
     public boolean canUse(Player player, WaystoneData data) {
-        if (!data.coreActive() && !(data.isAdmin() && plugin.getConfig().getBoolean("core.admin-bypass", true))) return false;
+        if (!coreOperational(data)) return false;
         if (player.hasPermission("cdrwaystone.admin")) return true;
         return plugin.access().canAccess(player, data) && status(player, data) == State.ACTIVATED;
     }
 
     public boolean discover(Player player, WaystoneData data, boolean notify) {
         if (!plugin.getConfig().getBoolean("discovery.enabled", true)) return false;
+        if (isOfficialAutoUnlocked(data)) return false;
         if (!canDiscover(player, data)) return false;
         if (status(player, data) != State.UNKNOWN) return false;
         setState(player.getUniqueId(), data.id(), State.DISCOVERED, true);
@@ -126,7 +133,7 @@ public final class DiscoveryService {
     }
 
     public boolean activate(Player player, WaystoneData data) {
-        if (!data.coreActive() && !(data.isAdmin() && plugin.getConfig().getBoolean("core.admin-bypass", true))) {
+        if (!coreOperational(data)) {
             plugin.feedback().action(player, "§5Dormant Waystone §7• §dCore required");
             return false;
         }
@@ -135,6 +142,7 @@ public final class DiscoveryService {
             plugin.feedback().action(player, "§cAccess denied");
             return false;
         }
+        if (isOfficialAutoUnlocked(data)) return true;
         if (!player.hasPermission("cdrwaystone.admin") && status(player, data) == State.UNKNOWN) {
             plugin.feedback().action(player, "§7Waystone not discovered yet");
             return false;
@@ -173,6 +181,18 @@ public final class DiscoveryService {
         if (saveNow) save();
     }
 
+    public boolean isOfficialAutoUnlocked(WaystoneData data) {
+        if (data == null || !data.isAdmin() || !data.publicAccess()) return false;
+        if (!plugin.getConfig().getBoolean("network.global-network", true)) return false;
+        if (!plugin.getConfig().getBoolean("network.cross-world.official-waystones-auto-unlocked", true)) return false;
+        return coreOperational(data);
+    }
+
+    private boolean coreOperational(WaystoneData data) {
+        return data != null && (data.coreActive()
+                || (data.isAdmin() && plugin.getConfig().getBoolean("core.admin-bypass", true)));
+    }
+
     private State storedState(UUID playerId, UUID waystoneId) {
         Map<UUID, State> states = playerStates.get(playerId);
         return states == null ? State.UNKNOWN : states.getOrDefault(waystoneId, State.UNKNOWN);
@@ -189,6 +209,7 @@ public final class DiscoveryService {
         double radiusSquared = radius * radius;
         for (Player player : Bukkit.getOnlinePlayers()) {
             for (WaystoneData data : plugin.registry().all()) {
+                if (isOfficialAutoUnlocked(data)) continue;
                 if (status(player, data) != State.UNKNOWN || !canDiscover(player, data)) continue;
                 Location location = data.location();
                 if (location == null || !location.getWorld().equals(player.getWorld())) continue;
