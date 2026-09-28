@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.5.1 - Rotating Spiral Laser
+
+- Reworked the Waystone charging laser into a slim rotating helix instead of a static solid column.
+- Added a small white center core plus two configurable light-blue/cyan laser strands that orbit the Waystone.
+- Laser strand radius expands gradually from the Waystone base toward the top of the beam.
+- Added configurable strand count, segment count, minimum/maximum radius, helix turns, rotation speed, core width, and strand width.
+- Reworked the travelling-player aura into an expanding conical spiral: tight around the feet and wider toward the head.
+- Added a faint counter-spiral for depth while keeping the player skin visible.
+- Reduced default particle density, spark count, and departure/arrival burst volume compared with the previous visual preset.
+- Arrival lasers use the same rotating helix animation for a short configurable duration.
+- Visual cleanup remains automatic on success, cancellation, disconnect, reload, and shutdown.
+- Global Cross-World Network behavior from v0.6.5 is unchanged.
+
 ## 0.6.5 - Global Cross-World Network
 
 - Added a first-class global Waystone Network spanning multiple Bukkit worlds.
